@@ -205,10 +205,9 @@
       {c:"O", temp:[30000,50000], mass:[16,60], color:"#bcd1ff", bias:0.001},
     ];
 
-  const ROCKY_COLORS=["#caa370","#a0a0a0","#b97c5e","#7f8fa0","#6f5b4b","#8c9784","#9f886b","#7a6f66","#95a4ad","#6b5d84"];
-  // Vibrant color palettes
-  const VIBRANT_GAS_STRIPES=["#ff5eae","#ffb300","#00eaff","#ff3c6e","#00ff8c","#ff6b00","#00aaff","#ff00c8","#ffe600","#00ffea"];
-  const VIBRANT_ICE_COLORS=["#00eaff","#00bfff","#00ffd0","#00ffea","#00ffe6","#00e6ff","#00c8ff","#00ffb3"];
+    const ROCKY_COLORS=["#caa370","#a0a0a0","#b97c5e","#7f8fa0","#6f5b4b","#8c9784","#9f886b","#7a6f66","#95a4ad","#6b5d84"];
+    const GAS_STRIPES=["#cfd8ff","#a8b8ff","#86a7ff","#8790d1","#6c79c8","#adb8ff","#98a9ff"];
+    const ICE_COLORS=["#bfe3ff","#cfeaff","#d9f3ff","#f0fbff","#a3d6ff"]; 
 
     function pickSpec(r){
       const total = SPEC_CLASSES.reduce((s,o)=>s+o.bias,0);
@@ -265,29 +264,15 @@
         if(type==="rocky"){
           radiusE = +(randRange(r, 0.5, 1.8).toFixed(2));
           massE = +(Math.pow(radiusE, 3) * randRange(r, 0.8, 1.3)).toFixed(2);
-          // If atmosphere is significant, use vibrant color
-          const atm = makeAtmosphere(r, type);
-          if(atm.pressure > 0.3 && !/No significant/.test(atm.desc)) {
-            // Vibrant HSL color (random hue, high sat, mid-high light)
-            const hue = Math.floor(randRange(r, 180, 340));
-            color = `hsl(${hue}, 85%, 55%)`;
-          } else {
-            color = choice(r, ROCKY_COLORS);
-          }
+          color = choice(r, ROCKY_COLORS);
         } else if(type==="gas giant"){
           radiusE = +(randRange(r, 5, 12).toFixed(2));
           massE = +(randRange(r, 30, 300).toFixed(1));
-          color = choice(r, VIBRANT_GAS_STRIPES);
+          color = choice(r, GAS_STRIPES);
         } else {
           radiusE = +(randRange(r, 3, 5).toFixed(2));
           massE = +(randRange(r, 10, 30).toFixed(1));
-          // If atmosphere is significant, use vibrant ice color
-          const atm = makeAtmosphere(r, type);
-          if(atm.pressure > 10) {
-            color = choice(r, VIBRANT_ICE_COLORS);
-          } else {
-            color = choice(r, ICE_COLORS);
-          }
+          color = choice(r, ICE_COLORS);
         }
         const ecc = +(randRange(r, 0, 0.1).toFixed(3));
         const periodY = +Math.sqrt(Math.pow(aAU,3)/star.mass).toFixed(2);
@@ -524,7 +509,7 @@
         const bandH = pr*0.22;
         for(let i=0;i<bands;i++){
           const t = i/(bands-1);
-          const c = VIBRANT_GAS_STRIPES[i%VIBRANT_GAS_STRIPES.length];
+          const c = GAS_STRIPES[i%GAS_STRIPES.length];
           ctx.fillStyle = c;
           const y = py - pr + t*pr*2 - bandH/2;
           ctx.fillRect(px - pr, y, pr*2, bandH);
