@@ -312,19 +312,19 @@
     function makeAtmosphere(r, type){
       if(type==='rocky'){
         const options=[
-          {desc:"N₂–O₂ (Earthlike)", pressure: randRange(r,0.6,1.8), breathable: r.rand()>0.7},
-          {desc:"CO₂–N₂ (thin)", pressure: randRange(r,0.05,0.4), breathable:false},
+          {desc:"N₂-O₂ (Earthlike)", pressure: randRange(r,0.6,1.8), breathable: r.rand()>0.7},
+          {desc:"CO₂-N₂ (thin)", pressure: randRange(r,0.05,0.4), breathable:false},
           {desc:"CO₂ (dense)", pressure: randRange(r,2,9), breathable:false},
-          {desc:"N₂–CH₄ (hazy)", pressure: randRange(r,0.7,2.5), breathable:false},
+          {desc:"N₂-CH₄ (hazy)", pressure: randRange(r,0.7,2.5), breathable:false},
           {desc:"No significant atmosphere", pressure: 0.01, breathable:false},
-          {desc:"H₂O–N₂ (humid)", pressure: randRange(r,0.8,1.5), breathable: r.rand()>0.5},
+          {desc:"H₂O-N₂ (humid)", pressure: randRange(r,0.8,1.5), breathable: r.rand()>0.5},
         ];
         return choice(r, options);
       }
       if(type==='gas giant'){
-        return {desc:"H₂–He with trace CH₄/NH₃", pressure: randRange(r, 50, 300), breathable:false};
+        return {desc:"H₂-He with trace CH₄/NH₃", pressure: randRange(r, 50, 300), breathable:false};
       }
-      return {desc:"H₂–He–CH₄ (icy)", pressure: randRange(r, 20, 120), breathable:false};
+      return {desc:"H₂-He-CH₄ (icy)", pressure: randRange(r, 20, 120), breathable:false};
     }
 
     function evaluateLife(r, type, aAU, hz, atm, Teq){
@@ -610,7 +610,7 @@
             <div>Radius</div><div>${s.radiusSolar} R☉</div>
             <div>Temp</div><div>${s.temp} K</div>
             <div>Luminosity</div><div>${s.luminosity.toFixed(2)} L☉</div>
-            <div>HZ</div><div>${s.hz[0]}–${s.hz[1]} AU</div>
+            <div>HZ</div><div>${s.hz[0]}-${s.hz[1]} AU</div>
           </div>`;
       }
       if(t.kind==='planet'){
@@ -717,7 +717,7 @@
             <div>Radius</div><div>${s.radiusSolar} R☉</div>
             <div>Temperature</div><div>${s.temp} K</div>
             <div>Luminosity</div><div>${s.luminosity} L☉</div>
-            <div>Habitable Zone</div><div>${s.hz[0]}–${s.hz[1]} AU</div>
+            <div>Habitable Zone</div><div>${s.hz[0]}-${s.hz[1]} AU</div>
           </div>
         `);
       }
