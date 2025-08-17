@@ -206,7 +206,20 @@
     ];
 
     const ROCKY_COLORS=["#caa370","#a0a0a0","#b97c5e","#7f8fa0","#6f5b4b","#8c9784","#9f886b","#7a6f66","#95a4ad","#6b5d84"];
-    const GAS_STRIPES=["#cfd8ff","#a8b8ff","#86a7ff","#8790d1","#6c79c8","#adb8ff","#98a9ff"];
+    // Generate vibrant analogous color stripes for gas giants
+    function randomAnalogousColors(r, count=7, baseHue=null){
+      // Pick a random base hue if not provided
+      if(baseHue===null) baseHue = Math.floor(randRange(r, 180, 360));
+      const colors=[];
+      for(let i=0;i<count;i++){
+        // Spread hues ±20° from base
+        const hue = (baseHue + (i-(count/2))*18 + randRange(r,-6,6)) % 360;
+        const sat = randRange(r, 65, 90); // vibrant
+        const light = randRange(r, 55, 70); // mid-light
+        colors.push(`hsl(${Math.round(hue)},${Math.round(sat)}%,${Math.round(light)}%)`);
+      }
+      return colors;
+    }
     const ICE_COLORS=["#bfe3ff","#cfeaff","#d9f3ff","#f0fbff","#a3d6ff"]; 
 
     function pickSpec(r){
@@ -260,7 +273,7 @@
         if(typePick>0.6 && typePick<=0.8) type="gas giant";
         if(typePick<=0.6) type="rocky";
 
-        let radiusE, massE, color;
+        let radiusE, massE, color, stripes;
         if(type==="rocky"){
           radiusE = +(randRange(r, 0.5, 1.8).toFixed(2));
           massE = +(Math.pow(radiusE, 3) * randRange(r, 0.8, 1.3)).toFixed(2);
@@ -268,7 +281,9 @@
         } else if(type==="gas giant"){
           radiusE = +(randRange(r, 5, 12).toFixed(2));
           massE = +(randRange(r, 30, 300).toFixed(1));
-          color = choice(r, GAS_STRIPES);
+          // Generate a random analogous color scheme for stripes
+          stripes = randomAnalogousColors(r, 7);
+          color = stripes[Math.floor(randRange(r,0,7))];
         } else {
           radiusE = +(randRange(r, 3, 5).toFixed(2));
           massE = +(randRange(r, 10, 30).toFixed(1));
@@ -288,7 +303,7 @@
         const moons = makeMoons(r, type, radiusE);
 
         const name = `${sysName} ${String.fromCharCode(97+i).toUpperCase()}`;
-        planets.push({ kind:"planet", name, type, color, radiusE, massE, aAU, ecc, periodY, hasRings, atmosphere, albedo:+albedo.toFixed(2), Teq:+Teq.toFixed(0), life, moons });
+  planets.push({ kind:"planet", name, type, color, stripes, radiusE, massE, aAU, ecc, periodY, hasRings, atmosphere, albedo:+albedo.toFixed(2), Teq:+Teq.toFixed(0), life, moons });
       }
 
       return { seed: r.seed, name: sysName, star, planets };
@@ -507,9 +522,10 @@
         ctx.beginPath(); ctx.arc(px,py,pr,0,TAU); ctx.clip();
         const bands = 10;
         const bandH = pr*0.22;
+        const stripes = Array.isArray(p.stripes) && p.stripes.length ? p.stripes : randomAnalogousColors(makeRng(p.name), 7);
         for(let i=0;i<bands;i++){
           const t = i/(bands-1);
-          const c = GAS_STRIPES[i%GAS_STRIPES.length];
+          const c = stripes[i%stripes.length];
           ctx.fillStyle = c;
           const y = py - pr + t*pr*2 - bandH/2;
           ctx.fillRect(px - pr, y, pr*2, bandH);
