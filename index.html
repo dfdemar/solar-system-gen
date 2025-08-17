@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Procedural Solar System</title>
+  <style>
+    :root{
+      --bg: #0b1020;
+      --panel: #121a30;
+      --panel-2:#0f1530;
+      --text: #e6ecff;
+      --muted:#9fb3ff;
+      --accent:#5dd2ff;
+      --accent-2:#8affc1;
+      --warn:#ffb86b;
+      --danger:#ff6b6b;
+      --orbit:#2a365f;
+      --shadow: rgba(0,0,0,0.3);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body{
+      background: radial-gradient(1200px 800px at 80% 10%, #0f1a3a, var(--bg));
+      color: var(--text);
+      font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      overflow: hidden;
+    }
+    .app{
+      display: grid;
+      grid-template-rows: auto 1fr;
+      grid-template-columns: 1fr;
+      height: 100%;
+    }
+    header{
+      display:flex; gap:12px; align-items:center;
+      padding: 10px 14px; backdrop-filter: blur(6px);
+      background: linear-gradient(180deg, rgba(16,24,48,.8), rgba(14,20,40,.6));
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    header .title{ font-weight: 700; letter-spacing:.3px; }
+    header .muted{ color: var(--muted); }
+    .spacer{ flex:1; }
+    .btn{ cursor:pointer; border:1px solid rgba(255,255,255,0.12); background: var(--panel);
+      color: var(--text); padding:8px 10px; border-radius:10px; transition: transform .05s ease, background .2s;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .btn:hover{ background:#1a2446; }
+    .btn:active{ transform: translateY(1px); }
+    .btn.alt{ background: #0f2338; border-color: rgba(93,210,255,.35); }
+    .btn.warn{ background:#2d1f10; border-color:#5f3d14; color:#ffcf99; }
+
+    .field{ display:flex; align-items:center; gap:8px; background: var(--panel); padding:6px 8px; border-radius: 10px; border:1px solid rgba(255,255,255,0.1); }
+    .field input{
+      background: transparent; border: none; outline: none; color: var(--text);
+      padding: 6px 6px; width: 170px; font-family: inherit; font-size: 14px;
+    }
+    .toggle{ display:inline-flex; align-items:center; gap:8px; background: var(--panel); padding:6px 10px; border-radius: 999px; border:1px solid rgba(255,255,255,0.1); }
+    .toggle input{ accent-color: var(--accent); width: 18px; height: 18px; }
+
+    .main{
+      display: grid; grid-template-columns: 1fr 320px; gap: 0; height: 100%; min-height:0;
+    }
+    #viewport{
+      position: relative; height: 100%; width: 100%; background: radial-gradient(600px 400px at 20% 20%, rgba(14,22,46,.6), transparent);
+    }
+    canvas{ width: 100%; height: 100%; display: block; }
+
+    aside{
+      height: 100%; background: linear-gradient(180deg, var(--panel), var(--panel-2)); border-left:1px solid rgba(255,255,255,0.08);
+      display:flex; flex-direction: column; min-width:0;
+    }
+    .panel-head{ padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); display:flex; align-items:center; gap:10px; }
+    .panel-head .badge{ background:#102a47; color:#9edcff; padding:4px 8px; border-radius:8px; font-size:12px; border:1px solid rgba(158,220,255,.3); }
+    .panel-scroll{ overflow:auto; padding: 10px 14px; display:flex; flex-direction:column; gap:10px; }
+
+    .card{ background: rgba(5,10,22,0.7); padding: 12px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; box-shadow: 0 6px 12px rgba(0,0,0,0.25); }
+    .card h3{ margin:0 0 6px 0; font-size: 16px; }
+    .kv{ display:grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+    .kv div{ color: var(--muted); }
+    .kv div:nth-child(2n){ color: var(--text); text-align:right; }
+
+    .legend{ display:flex; gap:8px; flex-wrap: wrap; font-size:12px; color:var(--muted); }
+    .dot{ width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px; vertical-align:middle; }
+
+    .tooltip{ position: fixed; pointer-events: none; background: rgba(14,22,46,.96); border:1px solid rgba(255,255,255,0.15); border-radius: 10px; padding:8px 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); min-width: 180px; z-index: 50; }
+    .tooltip h4{ margin:0 0 4px 0; font-size: 14px; }
+    .tooltip .sub{ color: var(--muted); font-size: 12px; }
+
+    .footer-note{ color:#8fb3ff; opacity:.75; font-size:12px; margin-top:4px; }
+    .pill{ display:inline-block; padding:3px 7px; border-radius:999px; font-size:12px; background:#0b2749; border:1px solid rgba(93,210,255,.28); color:#bfe9ff; }
+
+    @media (max-width: 980px){
+      .main{ grid-template-columns: 1fr; }
+      aside{ position: absolute; right: 10px; bottom: 10px; width: min(92vw, 420px); max-height: 60vh; border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
+      .panel-scroll{ padding-bottom: 18px; }
+    }
+  /* --- Sci‑Fi mode --- */
+    body.sci-fi{ --bg:#050912; --panel:#0a1226; --panel-2:#091122; --orbit:#0cecff; }
+    body.sci-fi header{ background: linear-gradient(180deg, rgba(12,26,58,.9), rgba(8,18,40,.65)); box-shadow: 0 6px 18px rgba(0, 245, 255, 0.2); }
+    body.sci-fi .title{ text-shadow: 0 0 8px rgba(0,245,255,.5); }
+    .fx{ position:absolute; inset:0; pointer-events:none; }
+    .fx-scan{ background: repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 3px, transparent 6px); mix-blend-mode: overlay; opacity:.35; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title">🌌 Procedural Solar System <span class="muted">· hover or click for details</span></div>
+      <div class="spacer"></div>
+      <label class="field" title="Seed controls the random generator. Same seed ⇒ same system.">
+        <span>Seed</span>
+        <input id="seedInput" placeholder="random" />
+        <button class="btn alt" id="applySeed">Apply</button>
+      </label>
+      <button class="btn" id="btnRandom">Randomize</button>
+      <button class="btn" id="btnPause">Pause</button>
+      <button class="btn alt" id="btnSciFi">Sci‑Fi Mode</button>
+      <label class="toggle" title="Toggle orbit lines">
+        <input type="checkbox" id="chkOrbits" checked />
+        <span>Orbits</span>
+      </label>
+      <label class="toggle" title="Toggle labels">
+        <input type="checkbox" id="chkLabels" checked />
+        <span>Labels</span>
+      </label>
+      <button class="btn" id="btnReset">Reset View</button>
+      <button class="btn alt" id="btnExportJson" title="Export system JSON">Export</button>
+      <button class="btn alt" id="btnLink" title="Copy a link with this seed">Copy Link</button>
+    </header>
+
+    <div class="main">
+      <div id="viewport" aria-label="Star system viewport">
+        <canvas id="canvas"></canvas>
+        <div class="fx fx-scan" id="fxScan" style="display:none"></div>
+      </div>
+      <aside>
+        <div class="panel-head">
+          <div style="font-weight:700">Inspector</div>
+          <span class="badge" id="selectionType">(none)</span>
+          <div class="spacer"></div>
+          <span class="pill" id="systemName">—</span>
+        </div>
+        <div class="panel-scroll" id="info">
+          <div class="card">
+            <h3>How to use</h3>
+            <div class="legend">
+              <div><span class="dot" style="background:#ffd15c"></span>Star</div>
+              <div><span class="dot" style="background:#86a7ff"></span>Gas/Ice Giant</div>
+              <div><span class="dot" style="background:#bde072"></span>Rocky</div>
+              <div><span class="dot" style="background:#d4d4d4"></span>Moon</div>
+            </div>
+            <p class="footer-note">Hover to preview an object's stats. Click to pin it here. Use <b>Seed</b> to recreate systems.</p>
+          </div>
+          <div id="cards"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="tooltip" class="tooltip" style="display:none"></div>
+
+  <script>
+    // ---------- Utilities: RNG, math, helpers ----------
+    function xmur3(str){
+      let h = 1779033703 ^ str.length;
+      for (let i=0;i<str.length;i++){
+        h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+        h = (h << 13) | (h >>> 19);
+      }
+      return function(){
+        h = Math.imul(h ^ (h >>> 16), 2246822507);
+        h = Math.imul(h ^ (h >>> 13), 3266489909);
+        return (h ^= h >>> 16) >>> 0;
+      }
+    }
+    function mulberry32(a){
+      return function(){
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), 1 | t);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+    }
+    function makeRng(seedStr){
+      if(!seedStr || !seedStr.trim()) seedStr = Math.random().toString(36).slice(2);
+      const seedFn = xmur3(seedStr);
+      return { seed: seedStr, rand: mulberry32(seedFn()) };
+    }
+    function randRange(r, a=0, b=1){ return a + r.rand() * (b - a); }
+    function choice(r, arr){ return arr[Math.floor(r.rand()*arr.length)] }
+    const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+    const lerp=(a,b,t)=>a+(b-a)*t;
+    const TAU = Math.PI*2;
+
+    // ---------- Domain: Generation ----------
+    const SPEC_CLASSES = [
+      {c:"M", temp:[2400,3700], mass:[0.1,0.6], color:"#ff6b6b", bias:0.72},
+      {c:"K", temp:[3700,5200], mass:[0.6,0.8], color:"#ffad66", bias:0.14},
+      {c:"G", temp:[5200,6000], mass:[0.8,1.2], color:"#ffd15c", bias:0.08},
+      {c:"F", temp:[6000,7500], mass:[1.2,1.6], color:"#ffe99a", bias:0.04},
+      {c:"A", temp:[7500,10000], mass:[1.6,2.4], color:"#e6f0ff", bias:0.015},
+      {c:"B", temp:[10000,30000], mass:[2.4,16], color:"#cfe2ff", bias:0.004},
+      {c:"O", temp:[30000,50000], mass:[16,60], color:"#bcd1ff", bias:0.001},
+    ];
+
+  const ROCKY_COLORS=["#caa370","#a0a0a0","#b97c5e","#7f8fa0","#6f5b4b","#8c9784","#9f886b","#7a6f66","#95a4ad","#6b5d84"];
+  // Vibrant color palettes
+  const VIBRANT_GAS_STRIPES=["#ff5eae","#ffb300","#00eaff","#ff3c6e","#00ff8c","#ff6b00","#00aaff","#ff00c8","#ffe600","#00ffea"];
+  const VIBRANT_ICE_COLORS=["#00eaff","#00bfff","#00ffd0","#00ffea","#00ffe6","#00e6ff","#00c8ff","#00ffb3"];
+
+    function pickSpec(r){
+      const total = SPEC_CLASSES.reduce((s,o)=>s+o.bias,0);
+      let t = r.rand()*total;
+      for(const sc of SPEC_CLASSES){ if((t-=sc.bias)<=0) return sc; }
+      return SPEC_CLASSES[0];
+    }
+
+    function computeLuminosity(mass){
+      return Math.pow(mass, 3.5);
+    }
+
+    function hzFromLum(L){
+      const inner = Math.sqrt(L/1.1);
+      const outer = Math.sqrt(L/0.53);
+      return [inner, outer];
+    }
+
+    function nameSystem(r){
+      const syllA=["Al","Bel","Cal","Del","Eri","Fae","Gly","Hel","Ira","Jax","Kai","Lyr","Myr","Nex","Or","Pra","Quel","Rho","Syl","Tor","Ur","Vex","Wyn","Xel","Yri","Zan"];
+      const syllB=["ara","oris","yra","ion","ara","eron","esis","arae","yxis","ara","ith","urn","ara","eon","os","arae","ides","ara","arae","ea","ius","a","ea","in","on"];
+      const s1=choice(r,syllA), s2=choice(r,syllB);
+      const num = Math.floor(randRange(r, 100, 900));
+      return `${s1}${s2}-${num}`;
+    }
+
+    function generateSystem(seedStr){
+      const r = makeRng(seedStr);
+      const spec = pickSpec(r);
+      const temp = Math.round(randRange(r, spec.temp[0], spec.temp[1]));
+      const mass = +(randRange(r, spec.mass[0], spec.mass[1]).toFixed(2));
+      const L = computeLuminosity(mass);
+      const radiusSolar = +(Math.pow(mass, 0.8).toFixed(2));
+      const [hzIn, hzOut] = hzFromLum(L);
+      const sysName = nameSystem(r);
+
+      const star = { kind:"star", name: sysName, spectral: spec.c, color: spec.color, temp, mass, radiusSolar, luminosity: +L.toFixed(2), hz:[+hzIn.toFixed(2), +hzOut.toFixed(2)] };
+
+      const nPlanets = Math.floor(randRange(r, 3, 12));
+      const planets = [];
+      let aPrev = randRange(r, 0.2, 0.5);
+
+      for(let i=0;i<nPlanets;i++){
+        const spacing = randRange(r, 1.4, 2.0);
+        const aAU = +(aPrev*spacing).toFixed(2);
+        aPrev = aAU;
+        const typePick = r.rand();
+        let type="rocky";
+        if(typePick>0.8) type="ice giant";
+        if(typePick>0.6 && typePick<=0.8) type="gas giant";
+        if(typePick<=0.6) type="rocky";
+
+        let radiusE, massE, color;
+        if(type==="rocky"){
+          radiusE = +(randRange(r, 0.5, 1.8).toFixed(2));
+          massE = +(Math.pow(radiusE, 3) * randRange(r, 0.8, 1.3)).toFixed(2);
+          // If atmosphere is significant, use vibrant color
+          const atm = makeAtmosphere(r, type);
+          if(atm.pressure > 0.3 && !/No significant/.test(atm.desc)) {
+            // Vibrant HSL color (random hue, high sat, mid-high light)
+            const hue = Math.floor(randRange(r, 180, 340));
+            color = `hsl(${hue}, 85%, 55%)`;
+          } else {
+            color = choice(r, ROCKY_COLORS);
+          }
+        } else if(type==="gas giant"){
+          radiusE = +(randRange(r, 5, 12).toFixed(2));
+          massE = +(randRange(r, 30, 300).toFixed(1));
+          color = choice(r, VIBRANT_GAS_STRIPES);
+        } else {
+          radiusE = +(randRange(r, 3, 5).toFixed(2));
+          massE = +(randRange(r, 10, 30).toFixed(1));
+          // If atmosphere is significant, use vibrant ice color
+          const atm = makeAtmosphere(r, type);
+          if(atm.pressure > 10) {
+            color = choice(r, VIBRANT_ICE_COLORS);
+          } else {
+            color = choice(r, ICE_COLORS);
+          }
+        }
+        const ecc = +(randRange(r, 0, 0.1).toFixed(3));
+        const periodY = +Math.sqrt(Math.pow(aAU,3)/star.mass).toFixed(2);
+
+        const hasRings = type!=='rocky' && r.rand()>0.5;
+
+        const atmosphere = makeAtmosphere(r, type);
+        const albedo = type==='rocky'? randRange(r,0.15,0.45) : (type==='gas giant' ? randRange(r,0.35,0.6) : randRange(r,0.45,0.7));
+        const Teq = Math.pow( (star.luminosity * (1-albedo)) , 0.25) * 278 / Math.sqrt(aAU);
+
+        const life = evaluateLife(r, type, aAU, star.hz, atmosphere, Teq);
+
+        const moons = makeMoons(r, type, radiusE);
+
+        const name = `${sysName} ${String.fromCharCode(97+i).toUpperCase()}`;
+        planets.push({ kind:"planet", name, type, color, radiusE, massE, aAU, ecc, periodY, hasRings, atmosphere, albedo:+albedo.toFixed(2), Teq:+Teq.toFixed(0), life, moons });
+      }
+
+      return { seed: r.seed, name: sysName, star, planets };
+    }
+
+    function makeAtmosphere(r, type){
+      if(type==='rocky'){
+        const options=[
+          {desc:"N₂–O₂ (Earthlike)", pressure: randRange(r,0.6,1.8), breathable: r.rand()>0.7},
+          {desc:"CO₂–N₂ (thin)", pressure: randRange(r,0.05,0.4), breathable:false},
+          {desc:"CO₂ (dense)", pressure: randRange(r,2,9), breathable:false},
+          {desc:"N₂–CH₄ (hazy)", pressure: randRange(r,0.7,2.5), breathable:false},
+          {desc:"No significant atmosphere", pressure: 0.01, breathable:false},
+          {desc:"H₂O–N₂ (humid)", pressure: randRange(r,0.8,1.5), breathable: r.rand()>0.5},
+        ];
+        return choice(r, options);
+      }
+      if(type==='gas giant'){
+        return {desc:"H₂–He with trace CH₄/NH₃", pressure: randRange(r, 50, 300), breathable:false};
+      }
+      return {desc:"H₂–He–CH₄ (icy)", pressure: randRange(r, 20, 120), breathable:false};
+    }
+
+    function evaluateLife(r, type, aAU, hz, atm, Teq){
+      let p = 0.01;
+      const withinHZ = aAU>hz[0]*0.9 && aAU<hz[1]*1.1;
+      if(type==='rocky' && withinHZ && atm.pressure>0.3 && atm.pressure<5 && !/No significant/.test(atm.desc)) p += 0.35;
+      if(type==='rocky' && Teq>250 && Teq<340) p += 0.25;
+      if(type!=='rocky' && withinHZ) p += 0.05;
+      p = clamp(p, 0, 0.85);
+      const has = r.rand() < p;
+
+      const lifeTypesRocky=[
+        "microbial mats in shallow seas",
+        "lichen-like surface colonies",
+        "plankton-rich oceans",
+        "chemosynthetic vent ecosystems",
+        "simple multicellular flora",
+        "burrowing microfauna in soils",
+        "algal blooms in crater lakes",
+      ];
+      const lifeTypesGas=[
+        "aerial plankton in cloud decks",
+        "floaters drifting in jet streams",
+        "photophoretic spores in haze layers",
+      ];
+      const desc = has ? (type==='rocky'? choice(r,lifeTypesRocky): choice(r,lifeTypesGas)) : "none detected";
+
+      let complexity = 'none';
+      if (has) {
+        if (type==='rocky' && /Earthlike|humid/.test(atm.desc) && Teq>260 && Teq<320) complexity = 'complex multicellular';
+        else if (type==='rocky') complexity = 'microbial';
+        else complexity = 'aerial microbial';
+      }
+      const water = has ? Math.round(clamp(withinHZ ? randRange(makeRng(r.seed+"w"), 30, 90) : randRange(makeRng(r.seed+"w"), 0, 40), 0, 100)) : 0;
+      const o2 = has ? (complexity==='complex multicellular' ? +(randRange(makeRng(r.seed+"o"), 10, 28).toFixed(1)) : +(randRange(makeRng(r.seed+"o"), 0.1, 8).toFixed(1))) : 0;
+      const ch4ppm = has ? Math.round(randRange(makeRng(r.seed+"m"), 2, 300)) : 0;
+      const co2 = has ? +(randRange(makeRng(r.seed+"c"), 0.01, 5).toFixed(2)) : (atm.desc.includes('CO₂')? +(randRange(makeRng(r.seed+"c"), 2, 90).toFixed(1)) : 0.04);
+      const biosignature = has ? +(clamp((o2/21) * 0.6 + (ch4ppm/200)*0.3 + (water/100)*0.4, 0, 1).toFixed(2)) : 0;
+      const metabRocky = ["oxygenic photosynthesis","anoxygenic photosynthesis","chemosynthesis (sulfide)","chemosynthesis (methanogenic)"];
+      const metabGas   = ["aerobic cloud plankton","ammonia-based reducers","photophoretic spores"];
+      const metabolism = has ? (type==='rocky' ? choice(makeRng(r.seed+"met"), metabRocky) : choice(makeRng(r.seed+"met"), metabGas)) : "—";
+      const biomes = has && type==='rocky' ? ["coasts","shallow seas","tidal flats","lake basins","basaltic deserts","alpine"]
+                        .filter(()=> r.rand()>0.45).slice(0,4) : (has ? ["cloud decks","updraft belts","calm anvils"].filter(()=> r.rand()>0.5) : []);
+      const intelligent = has && complexity==='complex multicellular' && r.rand()<0.02;
+
+      return { has, description: desc, complexity, water, o2, ch4ppm, co2, biosignature, metabolism, biomes, intelligent };
+    }
+
+    function makeMoons(r, type, radiusE){
+      let n=0;
+      if(type==='rocky') n = r.rand()>0.6 ? Math.floor(randRange(r,1,2.6)) : (r.rand()>0.9?1:0);
+      if(type!=='rocky') n = Math.floor(randRange(r, 2, 9));
+      n = Math.min(n, 12);
+      const moons=[];
+      let a = randRange(r, 4, 8) * radiusE * 6371;
+      for(let i=0;i<n;i++){
+        a *= randRange(r, 1.3, 1.8);
+        const size = +(randRange(r, 0.1, type==='rocky'?0.6:0.9).toFixed(2));
+        const periodD = +(randRange(r, 1, 40).toFixed(1));
+        moons.push({ kind:"moon", name:`m${i+1}`, size, aRel:a, periodD, color: i%3===0?"#d4d4d4":"#bdbdbd" });
+      }
+      return moons;
+    }
+
+    // ---------- Rendering ----------
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const viewportEl = document.getElementById('viewport');
+    const DPR = Math.min(2, window.devicePixelRatio || 1);
+
+    const state = {
+      system: null,
+      t: 0,
+      paused: false,
+      showOrbits: true,
+      showLabels: true,
+      zoom: 1,
+      pan: {x:0, y:0},
+      hover: null,
+      selected: null,
+      sciFi: false,
+    };
+
+    function resize(){
+      const rect = viewportEl.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+      canvas.width = Math.floor(w * DPR);
+      canvas.height = Math.floor(h * DPR);
+    }
+    window.addEventListener('resize', resize);
+    const ro = new ResizeObserver(()=>resize());
+    ro.observe(viewportEl);
+
+    function clear(){
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+
+    function worldToScreen(x,y){
+      const cx = canvas.width/2 + state.pan.x * DPR;
+      const cy = canvas.height/2 + state.pan.y * DPR;
+      return [ cx + x*state.zoom, cy + y*state.zoom ];
+    }
+
+    function drawGlow(x,y,r, color){
+      const [sx,sy]=worldToScreen(x,y);
+      const g = ctx.createRadialGradient(sx,sy, r*0.1*DPR, sx,sy, r*DPR);
+      g.addColorStop(0, color+'cc');
+      g.addColorStop(1, '#00000000');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,sy,r*DPR,0,TAU); ctx.fill();
+    }
+
+    function drawStar(star){
+      const r = 28;
+      const [sx,sy]=worldToScreen(0,0);
+      if(state.sciFi){
+        for(let i=1;i<=3;i++){
+          const g = ctx.createRadialGradient(sx,sy, r*0.1*i*DPR, sx,sy, r*(3+i)*DPR);
+          g.addColorStop(0, 'rgba(0, 245, 255, 0.35)');
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,sy,r*(3+i)*DPR,0,TAU); ctx.fill();
+        }
+      } else {
+        const g = ctx.createRadialGradient(sx,sy, r*0.1*DPR, sx,sy, r*6*DPR);
+        g.addColorStop(0, star.color+'cc'); g.addColorStop(1, '#0000');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,sy,r*6*DPR,0,TAU); ctx.fill();
+      }
+      ctx.fillStyle = state.sciFi ? '#fff6cc' : star.color;
+      ctx.beginPath(); ctx.arc(sx,sy,r*DPR,0,TAU); ctx.fill();
+      ctx.globalAlpha=0.18; ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.arc(sx-r*0.3*DPR, sy-r*0.3*DPR, r*0.6*DPR, 0, TAU); ctx.fill(); ctx.globalAlpha=1;
+      if(state.sciFi){
+        ctx.save(); ctx.strokeStyle='rgba(0,245,255,0.7)'; ctx.lineWidth=1.2*DPR; ctx.setLineDash([4*DPR,4*DPR]);
+        ctx.beginPath(); ctx.arc(sx,sy,r*3.2*DPR,0,TAU); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha=0.4; ctx.beginPath(); ctx.arc(sx,sy,r*4.5*DPR,0,TAU); ctx.stroke(); ctx.restore();
+      }
+      if(state.showLabels){ drawLabel(sx,sy-36*DPR, state.system.star.name); }
+      return {x:sx, y:sy, r:r*DPR};
+    }
+
+    function drawOrbit(cx, cy, radius){
+      if(state.sciFi){
+        ctx.save();
+        ctx.shadowColor = '#00eaff';
+        ctx.shadowBlur = 12 * DPR;
+        ctx.strokeStyle = 'rgba(0,245,255,0.85)';
+        ctx.lineWidth = 1.5 * DPR;
+        ctx.setLineDash([6*DPR,6*DPR]);
+        ctx.beginPath(); ctx.arc(cx, cy, radius, 0, TAU); ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.strokeStyle = 'rgba(120,145,210,0.25)';
+        ctx.lineWidth = 1 * DPR;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(cx, cy, radius, 0, TAU); ctx.stroke();
+      }
+    }
+
+    function drawLabel(sx, sy, text){
+      ctx.font = `${12*DPR}px ui-sans-serif, system-ui`;
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      if(state.sciFi){
+        ctx.save(); ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.shadowColor='#00eaff'; ctx.shadowBlur=8*DPR;
+        ctx.fillText(text, sx, sy); ctx.restore();
+      } else {
+        ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillText(text, sx, sy);
+      }
+    }
+
+    function drawPlanet(p, idx, time, hitList){
+      const orbitR = 70*DPR + idx*50*DPR;
+      const [cx,cy] = worldToScreen(0,0);
+      if(state.showOrbits) drawOrbit(cx,cy,orbitR);
+
+      const ang = (time / (p.periodY||1)) * TAU + idx*0.62;
+      const px = cx + Math.cos(ang)*orbitR;
+      const py = cy + Math.sin(ang)*orbitR;
+
+      if(p.hasRings){
+        ctx.save();
+        ctx.translate(px,py);
+        ctx.rotate(0.6);
+        ctx.globalAlpha=0.7;
+        ctx.strokeStyle='rgba(200,200,255,0.35)';
+        ctx.lineWidth=6*DPR; ctx.beginPath(); ctx.ellipse(0,0, (p.radiusE*1.6+12)*DPR, (p.radiusE*0.8+8)*DPR, 0, 0, TAU); ctx.stroke();
+        ctx.globalAlpha=1; ctx.restore();
+      }
+
+      const pr = (p.radiusE*2.2 + 6) * DPR;
+      if(p.type==='rocky'){
+        ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(px,py,pr,0,TAU); ctx.fill();
+        ctx.globalAlpha=0.18; ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(px-pr*0.2, py-pr*0.2, pr*0.8, 0, TAU); ctx.fill(); ctx.globalAlpha=1;
+      } else if(p.type==='gas giant'){
+        ctx.save();
+        ctx.beginPath(); ctx.arc(px,py,pr,0,TAU); ctx.clip();
+        const bands = 10;
+        const bandH = pr*0.22;
+        for(let i=0;i<bands;i++){
+          const t = i/(bands-1);
+          const c = VIBRANT_GAS_STRIPES[i%VIBRANT_GAS_STRIPES.length];
+          ctx.fillStyle = c;
+          const y = py - pr + t*pr*2 - bandH/2;
+          ctx.fillRect(px - pr, y, pr*2, bandH);
+        }
+        ctx.restore();
+        ctx.globalAlpha=0.18; ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(px-pr*0.2, py-pr*0.2, pr*0.98, 0, TAU); ctx.fill(); ctx.globalAlpha=1;
+      } else {
+        const grad = ctx.createRadialGradient(px-pr*0.3,py-pr*0.3, pr*0.1, px,py, pr);
+        grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, p.color);
+        ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(px,py,pr,0,TAU); ctx.fill();
+        ctx.globalAlpha=0.12; ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(px-pr*0.2, py-pr*0.2, pr*0.95, 0, TAU); ctx.fill(); ctx.globalAlpha=1;
+      }
+
+      if(state.showLabels){ drawLabel(px, py - pr - 8*DPR, p.name); }
+
+      for(let i=0;i<p.moons.length;i++){
+        const m = p.moons[i];
+        const mr = (m.size*2 + 2) * DPR;
+        const ma = (time / (m.periodD/365)) * TAU + i*0.6;
+        const mrad = pr + 10*DPR + i*6*DPR;
+        const mx = px + Math.cos(ma)*mrad;
+        const my = py + Math.sin(ma)*mrad;
+        ctx.fillStyle=m.color; ctx.beginPath(); ctx.arc(mx,my,mr,0,TAU); ctx.fill();
+        if(state.showOrbits){ ctx.strokeStyle='rgba(180,190,220,0.25)'; ctx.lineWidth=1*DPR; ctx.beginPath(); ctx.arc(px,py,mrad,0,TAU); ctx.stroke(); }
+        hitList.push({kind:'moon', ref:m, parent:p, x:mx, y:my, r:mr});
+      }
+
+      hitList.push({kind:'planet', ref:p, x:px, y:py, r:pr});
+    }
+
+    function drawSystem(){
+      clear();
+      const s = state.system;
+      if(!s) return;
+      const starHit = drawStar(s.star);
+      const hits=[];
+
+      for(let i=0;i<s.planets.length;i++){
+        drawPlanet(s.planets[i], i, state.t, hits);
+      }
+
+      let hoverHit = state.hover;
+      let selectedHit = null;
+      if (state.selected) {
+        if (state.selected.kind === 'star') {
+          selectedHit = {x:starHit.x, y:starHit.y, r:starHit.r};
+        } else {
+          selectedHit = hits.find(h => h.kind===state.selected.kind && h.ref===state.selected.ref && (!h.parent || h.parent===state.selected.parent)) || null;
+        }
+      }
+      const drawHL = (h)=>{ if(!h) return; ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2*DPR; ctx.beginPath(); ctx.arc(h.x,h.y,h.r+4*DPR,0,TAU); ctx.stroke(); ctx.restore(); };
+      if (hoverHit) drawHL(hoverHit);
+      if (selectedHit) drawHL(selectedHit);
+
+      return {starHit, hits};
+    }
+
+    // ---------- Interaction ----------
+    const tooltip = document.getElementById('tooltip');
+    let hitCache=[];
+    let lastFrameStarHit = {x:0,y:0,r:0};
+
+    function updateTooltip(target, clientX, clientY){
+      if(!target){ tooltip.style.display='none'; return; }
+      const html = renderTooltipHTML(target);
+      tooltip.innerHTML = html;
+      tooltip.style.display='block';
+      const rect = tooltip.getBoundingClientRect();
+      let x = clientX + 14, y = clientY + 14;
+      if(x+rect.width > window.innerWidth-8) x = clientX - rect.width - 12;
+      if(y+rect.height > window.innerHeight-8) y = clientY - rect.height - 12;
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    }
+
+    function renderTooltipHTML(t){
+      if(t.kind==='star'){
+        const s = t.ref;
+        return `<h4>${s.name} <span class="sub">(${s.spectral}-type)</span></h4>
+          <div class="kv">
+            <div>Mass</div><div>${s.mass} M☉</div>
+            <div>Radius</div><div>${s.radiusSolar} R☉</div>
+            <div>Temp</div><div>${s.temp} K</div>
+            <div>Luminosity</div><div>${s.luminosity.toFixed(2)} L☉</div>
+            <div>HZ</div><div>${s.hz[0]}–${s.hz[1]} AU</div>
+          </div>`;
+      }
+      if(t.kind==='planet'){
+        const p=t.ref;
+        const lifePill = p.life.has
+          ? `<span class="pill">Life: ${p.life.description}</span>`
+          : '<span class="pill" style="background:#2d1220;border-color:#5a2a3e;color:#ff9db8">No Life</span>';
+        return `<h4>${p.name} <span class="sub">${p.type}</span></h4>
+          ${lifePill}
+          <div class="kv">
+            <div>Orbit</div><div>${p.aAU} AU</div>
+            <div>Period</div><div>${p.periodY} years</div>
+            <div>Radius</div><div>${p.radiusE} R⊕</div>
+            <div>Mass</div><div>${p.massE} M⊕</div>
+            <div>Teq</div><div>${p.Teq} K</div>
+            <div>Albedo</div><div>${p.albedo}</div>
+            <div>Atmos.</div><div>${p.atmosphere.desc}</div>
+            <div>Moons</div><div>${p.moons.length}</div>
+            ${p.life.has ? `<div>Life class</div><div>${p.life.complexity}</div>
+                           <div>Water</div><div>${p.life.water}%</div>
+                           <div>O₂</div><div>${p.life.o2}%</div>
+                           <div>CH₄</div><div>${p.life.ch4ppm} ppm</div>
+                           <div>Biosignature</div><div>${(p.life.biosignature*100).toFixed(0)}%</div>` : ''}
+          </div>`;
+      }
+      if(t.kind==='moon'){
+        const m=t.ref, p=t.parent;
+        return `<h4>${p.name} · ${m.name} <span class="sub">moon</span></h4>
+          <div class="kv">
+            <div>Size</div><div>${m.size} R⊕</div>
+            <div>Orbital period</div><div>${m.periodD} days</div>
+            <div>Host</div><div>${p.name}</div>
+          </div>`;
+      }
+      return '';
+    }
+
+    function pickTargetAt(x,y, starHit){
+      for(let i=hitCache.length-1;i>=0;i--){
+        const h=hitCache[i];
+        const dx=x-h.x, dy=y-h.y; if(dx*dx+dy*dy <= (h.r+3*DPR)**2) return h;
+      }
+      const dx=x-starHit.x, dy=y-starHit.y; if(dx*dx+dy*dy <= (starHit.r+6*DPR)**2){
+        return {kind:'star', ref: state.system.star, x: starHit.x, y: starHit.y, r: starHit.r};
+      }
+      return null;
+    }
+
+    canvas.addEventListener('mousemove', (e)=>{
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * DPR;
+      const y = (e.clientY - rect.top) * DPR;
+      const target = pickTargetAt(x,y, lastFrameStarHit);
+      state.hover = target;
+      updateTooltip(target, e.clientX, e.clientY);
+    });
+    canvas.addEventListener('mouseleave', ()=>{ state.hover=null; updateTooltip(null); });
+    canvas.addEventListener('click', (e)=>{
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * DPR;
+      const y = (e.clientY - rect.top) * DPR;
+      const target = pickTargetAt(x,y, lastFrameStarHit);
+      state.selected = target;
+      showInInspector(target);
+    });
+
+    let dragging=false, dragLast={x:0,y:0};
+    canvas.addEventListener('contextmenu', e=>e.preventDefault());
+    canvas.addEventListener('mousedown', (e)=>{
+      if(e.button===2){ dragging=true; dragLast.x=e.clientX; dragLast.y=e.clientY; }
+    });
+    window.addEventListener('mouseup', ()=>dragging=false);
+    window.addEventListener('mousemove', (e)=>{
+      if(!dragging) return;
+      state.pan.x += (e.clientX - dragLast.x);
+      state.pan.y += (e.clientY - dragLast.y);
+      dragLast.x=e.clientX; dragLast.y=e.clientY;
+    });
+    canvas.addEventListener('wheel', (e)=>{
+      const delta = Math.sign(e.deltaY);
+      const factor = delta>0 ? 0.9 : 1.1;
+      state.zoom = clamp(state.zoom * factor, 0.4, 2.5);
+    }, {passive:true});
+
+    // ---------- Inspector ----------
+    function showInInspector(target){
+      const wrap = document.getElementById('cards');
+      wrap.innerHTML='';
+      if(!target){ document.getElementById('selectionType').textContent='(none)'; return; }
+      document.getElementById('selectionType').textContent = target.kind;
+
+      function addCard(title, html){
+        const div=document.createElement('div');
+        div.className='card';
+        div.innerHTML=`<h3>${title}</h3>${html}`;
+        wrap.appendChild(div);
+      }
+
+      if(target.kind==='star'){
+        const s=target.ref;
+        addCard(`${s.name} (${s.spectral}-type)`, `
+          <div class="kv">
+            <div>Mass</div><div>${s.mass} M☉</div>
+            <div>Radius</div><div>${s.radiusSolar} R☉</div>
+            <div>Temperature</div><div>${s.temp} K</div>
+            <div>Luminosity</div><div>${s.luminosity} L☉</div>
+            <div>Habitable Zone</div><div>${s.hz[0]}–${s.hz[1]} AU</div>
+          </div>
+        `);
+      }
+      if(target.kind==='planet'){
+        const p=target.ref;
+        addCard(`${p.name} · ${p.type}`, `
+          <div class="kv">
+            <div>Orbit (a)</div><div>${p.aAU} AU</div>
+            <div>Period</div><div>${p.periodY} years</div>
+            <div>Eccentricity</div><div>${p.ecc}</div>
+            <div>Radius</div><div>${p.radiusE} R⊕</div>
+            <div>Mass</div><div>${p.massE} M⊕</div>
+            <div>Albedo</div><div>${p.albedo}</div>
+            <div>Teq</div><div>${p.Teq} K</div>
+            <div>Atmosphere</div><div>${p.atmosphere.desc} · ${p.atmosphere.pressure.toFixed(2)} bar ${p.atmosphere.breathable?"· breathable":""}</div>
+            <div>Rings</div><div>${p.hasRings?"yes":"no"}</div>
+            <div>Moons</div><div>${p.moons.length}</div>
+            <div>Life</div><div>${p.life.has? p.life.description: 'none detected'}</div>
+          </div>
+        `);
+        if(p.life.has){
+          const biomes = p.life.biomes && p.life.biomes.length ? p.life.biomes.join(', ') : '—';
+          addCard('Life Details', `
+            <div class="kv">
+              <div>Classification</div><div>${p.life.complexity}${p.life.intelligent? ' (intelligent)':''}</div>
+              <div>Biosignature</div><div>${(p.life.biosignature*100).toFixed(0)}%</div>
+              <div>Dominant metabolism</div><div>${p.life.metabolism}</div>
+              <div>Surface water</div><div>${p.life.water}%</div>
+              <div>O₂</div><div>${p.life.o2}%</div>
+              <div>CH₄</div><div>${p.life.ch4ppm} ppm</div>
+              <div>CO₂</div><div>${p.life.co2}%</div>
+              <div>Biomes</div><div>${biomes}</div>
+            </div>
+          `);
+        }
+        if(p.moons.length){
+          const rows = p.moons.map((m,i)=>`<div>${p.name} · ${m.name}</div><div>${m.size} R⊕</div><div>${m.periodD} d</div>`).join('');
+          addCard('Moons', `<div class="kv"><div><b>Name</b></div><div><b>Size</b></div><div><b>Period</b></div>${rows}</div>`);
+        }
+      }
+      if(target.kind==='moon'){
+        const m=target.ref, p=target.parent;
+        addCard(`${p.name} · ${m.name}`, `
+          <div class="kv">
+            <div>Size</div><div>${m.size} R⊕</div>
+            <div>Period</div><div>${m.periodD} days</div>
+            <div>Host</div><div>${p.name}</div>
+          </div>
+        `);
+      }
+    }
+
+    // ---------- Controls ----------
+    function applySeed(seed){
+      state.system = generateSystem(seed);
+      document.getElementById('systemName').textContent = state.system.name + ' · seed ' + state.system.seed;
+      state.t = 0; state.pan={x:0,y:0}; state.zoom=1; state.selected=null; showInInspector(null);
+      try{ history.replaceState(null, '', '#'+encodeURIComponent(state.system.seed)); }catch{}
+    }
+
+    document.getElementById('btnRandom').onclick = ()=>{
+      applySeed(Math.random().toString(36).slice(2));
+      document.getElementById('seedInput').value = state.system.seed;
+    };
+    document.getElementById('btnPause').onclick = (e)=>{
+      state.paused=!state.paused; e.target.textContent = state.paused? 'Resume':'Pause';
+    };
+    document.getElementById('chkOrbits').onchange = (e)=>{ state.showOrbits = e.target.checked; };
+    document.getElementById('chkLabels').onchange = (e)=>{ state.showLabels = e.target.checked; };
+    document.getElementById('btnReset').onclick = ()=>{ state.zoom=1; state.pan={x:0,y:0}; };
+    document.getElementById('applySeed').onclick = ()=>{ applySeed(document.getElementById('seedInput').value || Math.random().toString(36).slice(2)); };
+
+    document.getElementById('btnExportJson').onclick = ()=>{
+      const data = JSON.stringify(state.system, null, 2);
+      const blob = new Blob([data], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${state.system.name.replace(/\\s+/g,'_')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    document.getElementById('btnLink').onclick = async ()=>{
+      const seed = state.system?.seed || '';
+      const url = location.origin + location.pathname + '#' + encodeURIComponent(seed);
+      try{ await navigator.clipboard.writeText(url); alert('Link copied to clipboard!'); }catch{ prompt('Copy link:', url); }
+    };
+
+    document.getElementById('btnSciFi').onclick = (e)=>{
+      state.sciFi = !state.sciFi;
+      document.body.classList.toggle('sci-fi', state.sciFi);
+      const fx = document.getElementById('fxScan'); if(fx) fx.style.display = state.sciFi ? 'block' : 'none';
+      e.target.textContent = state.sciFi ? 'Classic Mode' : 'Sci‑Fi Mode';
+    };
+
+    // ---------- Main loop ----------
+    let timeLast = performance.now();
+    function tick(now){
+      const dt = Math.min(0.05, (now-timeLast)/1000); timeLast = now;
+      if (canvas.width === 0 || canvas.height === 0) resize();
+      if(!state.paused) state.t += dt * 0.08;
+      const d = drawSystem();
+      if(d){ hitCache = d.hits; lastFrameStarHit = d.starHit; }
+      requestAnimationFrame(tick);
+    }
+
+    resize();
+    const hashSeed = decodeURIComponent((location.hash||'').slice(1));
+    applySeed(hashSeed || Math.random().toString(36).slice(2));
+    document.getElementById('seedInput').value = state.system.seed;
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
