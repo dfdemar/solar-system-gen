@@ -495,8 +495,9 @@
     }
 
     function drawPlanet(p, idx, time, hitList){
-        const AU_TO_PX = 70 * DPR; // base scale
-        const orbitR = AU_TO_PX * p.aAU;
+        // const AU_TO_PX = 70 * DPR; // base scale
+        // const orbitR = AU_TO_PX * p.aAU;
+        const orbitR = 70*DPR + idx*50*DPR;
         const [cx,cy] = worldToScreen(0,0);
         if(state.showOrbits) drawOrbit(cx,cy,orbitR);
 
