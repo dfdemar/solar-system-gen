@@ -495,13 +495,14 @@
     }
 
     function drawPlanet(p, idx, time, hitList){
-      const orbitR = 70*DPR + idx*50*DPR;
-      const [cx,cy] = worldToScreen(0,0);
-      if(state.showOrbits) drawOrbit(cx,cy,orbitR);
+        const AU_TO_PX = 70 * DPR; // base scale
+        const orbitR = AU_TO_PX * p.aAU;
+        const [cx,cy] = worldToScreen(0,0);
+        if(state.showOrbits) drawOrbit(cx,cy,orbitR);
 
-      const ang = (time / (p.periodY||1)) * TAU + idx*0.62;
-      const px = cx + Math.cos(ang)*orbitR;
-      const py = cy + Math.sin(ang)*orbitR;
+        const ang = (time / (p.periodY||1)) * TAU + idx*0.62;
+        const px = cx + Math.cos(ang)*orbitR;
+        const py = cy + Math.sin(ang)*orbitR;
 
       if(p.hasRings){
         ctx.save();
