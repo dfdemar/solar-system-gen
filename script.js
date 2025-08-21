@@ -334,7 +334,7 @@ function drawStar(star) {
     ctx.beginPath();
     ctx.arc(sx, sy, r * 6 * DPR, 0, TAU);
     ctx.fill();
-    
+
     ctx.fillStyle = star.color;
     ctx.beginPath();
     ctx.arc(sx, sy, r * DPR, 0, TAU);
@@ -345,7 +345,7 @@ function drawStar(star) {
     ctx.arc(sx - r * 0.3 * DPR, sy - r * 0.3 * DPR, r * 0.6 * DPR, 0, TAU);
     ctx.fill();
     ctx.globalAlpha = 1;
-    
+
     if (state.showLabels) {
         drawLabel(sx, sy - 36 * DPR, state.system.star.name);
     }
@@ -590,13 +590,13 @@ canvas.addEventListener('mousemove', (e) => {
     const x = (e.clientX - rect.left) * DPR;
     const y = (e.clientY - rect.top) * DPR;
     const target = pickTargetAt(x, y, lastFrameStarHit);
-    
+
     // Only mark for redraw if hover state actually changed
     if (state.hover !== target) {
         state.hover = target;
         markNeedsRedraw();
     }
-    
+
     updateTooltip(target, e.clientX, e.clientY);
 });
 
@@ -610,7 +610,7 @@ canvas.addEventListener('click', (e) => {
     const x = (e.clientX - rect.left) * DPR;
     const y = (e.clientY - rect.top) * DPR;
     const target = pickTargetAt(x, y, lastFrameStarHit);
-    
+
     if (state.selected !== target) {
         state.selected = target;
         showInInspector(target);
@@ -680,7 +680,7 @@ canvas.addEventListener('touchmove', (e) => {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const touchZoomNew = Math.hypot(dx, dy);
-        
+
         if (touchZoomStart > 0) {
             const zoomFactor = touchZoomNew / touchZoomStart;
             if (zoomFactor > 1.05 || zoomFactor < 0.95) {
@@ -707,7 +707,7 @@ canvas.addEventListener('keydown', (e) => {
     const panStep = 15; // pixels to pan per keypress
     const zoomStep = 0.1; // zoom factor per keypress
     let handled = true;
-    
+
     switch(e.key) {
         case 'ArrowLeft':
             state.pan.x += panStep;
@@ -737,7 +737,7 @@ canvas.addEventListener('keydown', (e) => {
         default:
             handled = false;
     }
-    
+
     if (handled) {
         e.preventDefault();
         markNeedsRedraw();
@@ -914,18 +914,18 @@ document.getElementById('btnReset').addEventListener('click', markNeedsRedraw);
 function tick(now) {
     const dt = Math.min(0.05, (now - timeLast) / 1000);
     timeLast = now;
-    
+
     if (canvas.width === 0 || canvas.height === 0) {
         resize();
         needsRedraw = true;
     }
-    
+
     // Only update time when not paused
     if (!state.paused) {
         state.t += dt * 0.08;
         needsRedraw = true; // Always redraw when animating
     }
-    
+
     // Only redraw when necessary
     if (needsRedraw) {
         const d = drawSystem();
@@ -935,7 +935,7 @@ function tick(now) {
         }
         needsRedraw = false;
     }
-    
+
     requestAnimationFrame(tick);
 }
 

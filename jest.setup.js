@@ -4,7 +4,7 @@ class MockCanvas {
     this.width = 800;
     this.height = 600;
   }
-  
+
   getContext() {
     return {
       clearRect: jest.fn(),
@@ -63,11 +63,11 @@ Object.defineProperty(global.document, 'getElementById', {
       case 'chkLabels':
       case 'btnExportJson':
       case 'btnLink':
-        return { 
+        return {
           addEventListener: jest.fn(),
           onclick: null,
           onchange: null,
-          checked: true 
+          checked: true
         };
       default:
         return null;

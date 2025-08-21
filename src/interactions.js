@@ -3,7 +3,7 @@ function updateTooltip(tooltipElement, target, clientX, clientY) {
         tooltipElement.style.display = 'none';
         return;
     }
-    
+
     tooltipElement.innerHTML = renderTooltipHTML(target);
     tooltipElement.style.display = 'block';
     const rect = tooltipElement.getBoundingClientRect();
@@ -26,7 +26,7 @@ function renderTooltipHTML(t) {
         <div>HZ</div><div>${s.hz[0]}-${s.hz[1]} AU</div>
       </div>`;
     }
-    
+
     if (t.kind === 'planet') {
         const p = t.ref;
         const lifePill = p.life.has
@@ -50,7 +50,7 @@ function renderTooltipHTML(t) {
                        <div>Biosignature</div><div>${(p.life.biosignature * 100).toFixed(0)}%</div>` : ''}
       </div>`;
     }
-    
+
     if (t.kind === 'moon') {
         const m = t.ref, p = t.parent;
         return `<h4>${p.name} · ${m.name} <span class="sub">moon</span></h4>
@@ -60,7 +60,7 @@ function renderTooltipHTML(t) {
         <div>Host</div><div>${p.name}</div>
       </div>`;
     }
-    
+
     return '';
 }
 
@@ -70,18 +70,18 @@ function pickTargetAt(x, y, starHit, hitCache) {
         const dx = x - h.x, dy = y - h.y;
         if (dx * dx + dy * dy <= (h.r + 3) ** 2) return h;
     }
-    
+
     const dx = x - starHit.x, dy = y - starHit.y;
     if (dx * dx + dy * dy <= (starHit.r + 6) ** 2) {
         return {
-            kind: 'star', 
+            kind: 'star',
             ref: starHit.ref,
-            x: starHit.x, 
-            y: starHit.y, 
+            x: starHit.x,
+            y: starHit.y,
             r: starHit.r
         };
     }
-    
+
     return null;
 }
 
@@ -91,7 +91,7 @@ function showInInspector(target, cardsElement, selectionTypeElement) {
         selectionTypeElement.textContent = '(none)';
         return;
     }
-    
+
     selectionTypeElement.textContent = target.kind;
 
     function addCard(title, html) {
@@ -113,7 +113,7 @@ function showInInspector(target, cardsElement, selectionTypeElement) {
       </div>
     `);
     }
-    
+
     if (target.kind === 'planet') {
         const p = target.ref;
         addCard(`${p.name} · ${p.type}`, `
@@ -132,7 +132,7 @@ function showInInspector(target, cardsElement, selectionTypeElement) {
       </div>
     `);
     }
-    
+
     if (target.kind === 'moon') {
         const m = target.ref, p = target.parent;
         addCard(`${p.name} · ${m.name}`, `
