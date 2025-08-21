@@ -409,30 +409,262 @@ function drawPlanet(p, idx, time, hitList) {
         // Generate deterministic surface features
         const rng = makeRng(p.name + '_surface');
         
-        // Add continents/land masses
-        for (let i = 0; i < 8; i++) {
-            const featureX = px + (rng.rand() - 0.5) * pr * 1.6;
-            const featureY = py + (rng.rand() - 0.5) * pr * 1.6;
-            const featureR = pr * (0.15 + rng.rand() * 0.25);
+        // Generate natural terrain base layer
+        for (let i = 0; i < 50; i++) {
+            const x = px + (rng.rand() - 0.5) * pr * 1.6;
+            const y = py + (rng.rand() - 0.5) * pr * 1.6;
+            const noise = rng.rand();
             
-            ctx.globalAlpha = 0.2 + rng.rand() * 0.15;
-            ctx.fillStyle = p.Teq > 300 ? '#8B4513' : (p.Teq < 250 ? '#E6E6FA' : '#228B22');
+            ctx.globalAlpha = 0.06;
+            const brightness = 0.7 + noise * 0.6;
+            ctx.fillStyle = `rgba(${Math.floor(brightness * 160)},${Math.floor(brightness * 140)},${Math.floor(brightness * 110)},1)`;
             ctx.beginPath();
-            ctx.arc(featureX, featureY, featureR, 0, TAU);
+            ctx.arc(x, y, pr * (0.015 + noise * 0.02), 0, TAU);
             ctx.fill();
         }
         
-        // Add craters
-        for (let i = 0; i < 12; i++) {
+        if (p.life.has || (p.Teq > 250 && p.Teq < 350 && p.atmosphere.breathable)) {
+            // Living world - organic landmasses
+            
+            const continents = 2 + Math.floor(rng.rand() * 2);
+            for (let c = 0; c < continents; c++) {
+                const centerX = px + (rng.rand() - 0.5) * pr * 0.8;
+                const centerY = py + (rng.rand() - 0.5) * pr * 0.8;
+                const size = 0.2 + rng.rand() * 0.25;
+                
+                // Create organic coastline
+                const coastPoints = [];
+                const numPoints = 16;
+                
+                for (let i = 0; i < numPoints; i++) {
+                    const angle = (i / numPoints) * TAU;
+                    let radius = size * pr;
+                    
+                    // Multi-frequency coastal variation
+                    radius *= 0.6 + 0.4 * (1 + Math.sin(angle * 2 + rng.rand() * TAU));
+                    radius *= 0.8 + 0.2 * (1 + Math.sin(angle * 5 + rng.rand() * TAU));
+                    radius *= 0.9 + 0.1 * (1 + Math.sin(angle * 12 + rng.rand() * TAU));
+                    
+                    coastPoints.push({
+                        x: centerX + Math.cos(angle) * radius,
+                        y: centerY + Math.sin(angle) * radius
+                    });
+                }
+                
+                // Draw continent with gradient
+                const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, size * pr);
+                if (p.life.has) {
+                    grad.addColorStop(0, 'rgba(50,100,30,0.25)');
+                    grad.addColorStop(1, 'rgba(30,70,20,0.1)');
+                } else {
+                    grad.addColorStop(0, 'rgba(140,115,85,0.2)');
+                    grad.addColorStop(1, 'rgba(120,95,65,0.1)');
+                }
+                ctx.fillStyle = grad;
+                
+                ctx.beginPath();
+                for (let i = 0; i < coastPoints.length; i++) {
+                    const curr = coastPoints[i];
+                    if (i === 0) {
+                        ctx.moveTo(curr.x, curr.y);
+                    } else {
+                        ctx.lineTo(curr.x, curr.y);
+                    }
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Add small inland features for living worlds
+                if (p.life.has) {
+                    for (let f = 0; f < 3; f++) {
+                        const featureX = centerX + (rng.rand() - 0.5) * size * pr * 0.6;
+                        const featureY = centerY + (rng.rand() - 0.5) * size * pr * 0.6;
+                        const featureSize = pr * (0.01 + rng.rand() * 0.02);
+                        
+                        ctx.fillStyle = rng.rand() > 0.5 ? 'rgba(70,130,180,0.3)' : 'rgba(34,139,34,0.3)';
+                        ctx.beginPath();
+                        ctx.arc(featureX, featureY, featureSize, 0, TAU);
+                        ctx.fill();
+                    }
+                }
+            }
+            
+        } else if (p.Teq > 400) {
+            // Volcanic world - realistic lava flows
+            
+            const volcanoes = 2 + Math.floor(rng.rand() * 2);
+            for (let v = 0; v < volcanoes; v++) {
+                const volcX = px + (rng.rand() - 0.5) * pr * 0.8;
+                const volcY = py + (rng.rand() - 0.5) * pr * 0.8;
+                const coneSize = pr * (0.04 + rng.rand() * 0.03);
+                
+                // Volcanic cone
+                const coneGrad = ctx.createRadialGradient(volcX, volcY, 0, volcX, volcY, coneSize);
+                coneGrad.addColorStop(0, 'rgba(139,69,19,0.4)');
+                coneGrad.addColorStop(1, 'rgba(101,67,33,0.1)');
+                ctx.fillStyle = coneGrad;
+                ctx.beginPath();
+                ctx.arc(volcX, volcY, coneSize, 0, TAU);
+                ctx.fill();
+                
+                // Lava flows
+                const flows = 2 + Math.floor(rng.rand() * 3);
+                for (let f = 0; f < flows; f++) {
+                    let flowX = volcX;
+                    let flowY = volcY;
+                    let flowAngle = (f / flows) * TAU + rng.rand() * 0.3;
+                    
+                    ctx.strokeStyle = 'rgba(255,69,0,0.4)';
+                    ctx.lineWidth = 1 + rng.rand();
+                    ctx.beginPath();
+                    ctx.moveTo(flowX, flowY);
+                    
+                    for (let step = 0; step < 8; step++) {
+                        flowAngle += (rng.rand() - 0.5) * 0.2;
+                        const stepSize = pr * 0.008;
+                        flowX += Math.cos(flowAngle) * stepSize;
+                        flowY += Math.sin(flowAngle) * stepSize;
+                        ctx.lineTo(flowX, flowY);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Glowing vent
+                ctx.fillStyle = 'rgba(255,140,0,0.6)';
+                ctx.beginPath();
+                ctx.arc(volcX, volcY, pr * 0.008, 0, TAU);
+                ctx.fill();
+            }
+            
+        } else if (p.Teq < 200) {
+            // Frozen world - ice formations
+            
+            const iceRegions = 2 + Math.floor(rng.rand() * 2);
+            for (let r = 0; r < iceRegions; r++) {
+                const iceX = px + (rng.rand() - 0.5) * pr * 0.8;
+                const iceY = py + (rng.rand() - 0.5) * pr * 0.8;
+                const iceSize = pr * (0.08 + rng.rand() * 0.12);
+                
+                // Organic ice sheet
+                const icePoints = [];
+                for (let i = 0; i < 10; i++) {
+                    const angle = (i / 10) * TAU;
+                    let radius = iceSize;
+                    radius *= 0.7 + 0.3 * (1 + Math.sin(angle * 2 + rng.rand()));
+                    radius *= 0.9 + 0.1 * (1 + Math.sin(angle * 6 + rng.rand()));
+                    
+                    icePoints.push({
+                        x: iceX + Math.cos(angle) * radius,
+                        y: iceY + Math.sin(angle) * radius
+                    });
+                }
+                
+                const iceGrad = ctx.createRadialGradient(iceX, iceY, 0, iceX, iceY, iceSize);
+                iceGrad.addColorStop(0, 'rgba(240,248,255,0.25)');
+                iceGrad.addColorStop(1, 'rgba(173,216,230,0.1)');
+                ctx.fillStyle = iceGrad;
+                
+                ctx.beginPath();
+                for (let i = 0; i < icePoints.length; i++) {
+                    const p = icePoints[i];
+                    if (i === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Ice crevasses
+                for (let c = 0; c < 2; c++) {
+                    let crevX = iceX + (rng.rand() - 0.5) * iceSize * 0.6;
+                    let crevY = iceY + (rng.rand() - 0.5) * iceSize * 0.6;
+                    let crevAngle = rng.rand() * TAU;
+                    
+                    ctx.strokeStyle = 'rgba(70,130,180,0.3)';
+                    ctx.lineWidth = 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(crevX, crevY);
+                    
+                    for (let step = 0; step < 4; step++) {
+                        crevAngle += (rng.rand() - 0.5) * 0.3;
+                        const stepSize = iceSize * 0.04;
+                        crevX += Math.cos(crevAngle) * stepSize;
+                        crevY += Math.sin(crevAngle) * stepSize;
+                        ctx.lineTo(crevX, crevY);
+                    }
+                    ctx.stroke();
+                }
+            }
+        } else {
+            // Desert/barren world - erosion patterns
+            
+            const formations = 2 + Math.floor(rng.rand() * 2);
+            for (let f = 0; f < formations; f++) {
+                const mesaX = px + (rng.rand() - 0.5) * pr * 0.6;
+                const mesaY = py + (rng.rand() - 0.5) * pr * 0.6;
+                const mesaSize = pr * (0.05 + rng.rand() * 0.08);
+                
+                // Layered rock formation
+                const layers = 2 + Math.floor(rng.rand() * 2);
+                for (let layer = 0; layer < layers; layer++) {
+                    const layerScale = (layers - layer) / layers;
+                    const layerAlpha = 0.1 + (layer / layers) * 0.1;
+                    
+                    ctx.fillStyle = `rgba(${205 - layer * 5},${133 + layer * 3},${63 + layer * 4},${layerAlpha})`;
+                    
+                    const lw = mesaSize * layerScale * 2;
+                    const lh = mesaSize * layerScale * 0.8;
+                    
+                    ctx.save();
+                    ctx.translate(mesaX, mesaY);
+                    ctx.rotate(rng.rand() * TAU);
+                    ctx.fillRect(-lw/2, -lh/2, lw, lh);
+                    ctx.restore();
+                }
+            }
+            
+            // Canyon systems
+            for (let c = 0; c < 1; c++) {
+                let canyonX = px + (rng.rand() - 0.5) * pr * 0.4;
+                let canyonY = py + (rng.rand() - 0.5) * pr * 0.4;
+                let canyonAngle = rng.rand() * TAU;
+                
+                ctx.strokeStyle = 'rgba(139,69,19,0.2)';
+                ctx.lineWidth = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(canyonX, canyonY);
+                
+                for (let step = 0; step < 6; step++) {
+                    canyonAngle += (rng.rand() - 0.5) * 0.2;
+                    const stepSize = pr * 0.015;
+                    canyonX += Math.cos(canyonAngle) * stepSize;
+                    canyonY += Math.sin(canyonAngle) * stepSize;
+                    ctx.lineTo(canyonX, canyonY);
+                }
+                ctx.stroke();
+            }
+        }
+        
+        // Add realistic crater impacts (fewer, more varied)
+        const craterCount = p.atmosphere.pressure > 0.1 ? 4 : 8; // Fewer craters if atmosphere protects
+        for (let i = 0; i < craterCount; i++) {
             const craterX = px + (rng.rand() - 0.5) * pr * 1.8;
             const craterY = py + (rng.rand() - 0.5) * pr * 1.8;
-            const craterR = pr * (0.05 + rng.rand() * 0.1);
+            const craterR = pr * (0.03 + rng.rand() * 0.08);
             
-            ctx.globalAlpha = 0.3;
-            ctx.fillStyle = '#000';
+            // Crater with rim and shadow
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.beginPath();
             ctx.arc(craterX, craterY, craterR, 0, TAU);
             ctx.fill();
+            
+            // Crater rim highlight
+            ctx.globalAlpha = 0.15;
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(craterX - craterR * 0.2, craterY - craterR * 0.2, craterR * 1.1, 0, TAU);
+            ctx.stroke();
         }
         
         // Add polar ice caps if cold enough
@@ -790,56 +1022,310 @@ function drawPlanetDetail(planet, canvas, ctx) {
         
         const rng = makeRng(planet.name + '_detailsurface');
         
-        // Large continental features
-        for (let i = 0; i < 15; i++) {
-            const featureX = px + (rng.rand() - 0.5) * pr * 1.8;
-            const featureY = py + (rng.rand() - 0.5) * pr * 1.8;
-            const featureR = pr * (0.1 + rng.rand() * 0.3);
+        // Generate detailed natural surface features based on planet type
+        if (planet.life.has || (planet.Teq > 250 && planet.Teq < 350 && planet.atmosphere.breathable)) {
+            // Earth-like world with detailed continents and biomes
             
-            ctx.globalAlpha = 0.3 + rng.rand() * 0.2;
-            if (planet.Teq > 350) ctx.fillStyle = '#CD853F'; // Hot desert
-            else if (planet.Teq < 250) ctx.fillStyle = '#F0F8FF'; // Ice
-            else ctx.fillStyle = rng.rand() > 0.6 ? '#228B22' : '#8B4513'; // Forest or rock
-            
-            ctx.beginPath();
-            ctx.arc(featureX, featureY, featureR, 0, TAU);
-            ctx.fill();
-        }
-        
-        // Mountain ranges (detailed)
-        for (let i = 0; i < 8; i++) {
-            const startX = px + (rng.rand() - 0.5) * pr * 1.6;
-            const startY = py + (rng.rand() - 0.5) * pr * 1.6;
-            ctx.strokeStyle = '#696969';
-            ctx.lineWidth = 2 + rng.rand() * 3;
-            ctx.globalAlpha = 0.6;
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            for (let j = 0; j < 5; j++) {
-                ctx.lineTo(startX + (rng.rand() - 0.5) * pr * 0.3, startY + (rng.rand() - 0.5) * pr * 0.3);
+            // Major continents with realistic coastlines
+            for (let i = 0; i < 3; i++) {
+                const centerX = px + (rng.rand() - 0.5) * pr * 1.6;
+                const centerY = py + (rng.rand() - 0.5) * pr * 1.6;
+                const continentSize = pr * (0.4 + rng.rand() * 0.5);
+                
+                ctx.globalAlpha = 0.25 + rng.rand() * 0.15;
+                ctx.fillStyle = planet.life.has ? '#228B22' : '#8B7355'; // Living worlds are greener
+                
+                // Create detailed continent with fractal-like coastline
+                ctx.beginPath();
+                const coastlinePoints = 16;
+                let lastX, lastY;
+                for (let j = 0; j <= coastlinePoints; j++) {
+                    const angle = (j / coastlinePoints) * TAU;
+                    const baseR = continentSize * (0.6 + rng.rand() * 0.8);
+                    
+                    // Add coastal detail with multiple frequency noise
+                    const detail1 = Math.sin(angle * 3 + rng.rand()) * continentSize * 0.15;
+                    const detail2 = Math.sin(angle * 8 + rng.rand()) * continentSize * 0.08;
+                    const detail3 = Math.sin(angle * 20 + rng.rand()) * continentSize * 0.03;
+                    
+                    const r = baseR + detail1 + detail2 + detail3;
+                    const x = centerX + Math.cos(angle) * r;
+                    const y = centerY + Math.sin(angle) * r;
+                    
+                    if (j === 0) {
+                        ctx.moveTo(x, y);
+                        lastX = x; lastY = y;
+                    } else {
+                        // Smooth curves between points
+                        const cpX = (lastX + x) / 2 + (rng.rand() - 0.5) * pr * 0.05;
+                        const cpY = (lastY + y) / 2 + (rng.rand() - 0.5) * pr * 0.05;
+                        ctx.quadraticCurveTo(cpX, cpY, x, y);
+                        lastX = x; lastY = y;
+                    }
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Add inland features (lakes, forests)
+                if (planet.life.has) {
+                    for (let k = 0; k < 8; k++) {
+                        const featureX = centerX + (rng.rand() - 0.5) * continentSize * 1.2;
+                        const featureY = centerY + (rng.rand() - 0.5) * continentSize * 1.2;
+                        const featureSize = pr * (0.02 + rng.rand() * 0.06);
+                        
+                        ctx.globalAlpha = 0.3;
+                        ctx.fillStyle = rng.rand() > 0.7 ? '#4169E1' : '#006400'; // Lakes or forests
+                        ctx.beginPath();
+                        ctx.arc(featureX, featureY, featureSize, 0, TAU);
+                        ctx.fill();
+                    }
+                }
             }
-            ctx.stroke();
+            
+            // Realistic mountain chains
+            for (let i = 0; i < 4; i++) {
+                const chainStartX = px + (rng.rand() - 0.5) * pr * 1.4;
+                const chainStartY = py + (rng.rand() - 0.5) * pr * 1.4;
+                const chainAngle = rng.rand() * TAU;
+                const chainLength = pr * (0.3 + rng.rand() * 0.4);
+                
+                ctx.globalAlpha = 0.4;
+                ctx.strokeStyle = '#696969';
+                ctx.lineWidth = 3 + rng.rand() * 2;
+                
+                // Draw mountain chain with peaks
+                ctx.beginPath();
+                for (let j = 0; j < 12; j++) {
+                    const t = j / 11;
+                    const baseX = chainStartX + Math.cos(chainAngle) * chainLength * t;
+                    const baseY = chainStartY + Math.sin(chainAngle) * chainLength * t;
+                    
+                    const peakOffset = (rng.rand() - 0.5) * pr * 0.1;
+                    const perpAngle = chainAngle + Math.PI / 2;
+                    const peakX = baseX + Math.cos(perpAngle) * peakOffset;
+                    const peakY = baseY + Math.sin(perpAngle) * peakOffset;
+                    
+                    if (j === 0) ctx.moveTo(peakX, peakY);
+                    else ctx.lineTo(peakX, peakY);
+                }
+                ctx.stroke();
+            }
+            
+        } else if (planet.Teq > 400) {
+            // Detailed volcanic world
+            
+            // Large volcanic calderas with lava flows
+            for (let i = 0; i < 3; i++) {
+                const volcanoX = px + (rng.rand() - 0.5) * pr * 1.4;
+                const volcanoY = py + (rng.rand() - 0.5) * pr * 1.4;
+                const calderaSize = pr * (0.1 + rng.rand() * 0.15);
+                
+                // Caldera rim
+                ctx.globalAlpha = 0.3;
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(volcanoX, volcanoY, calderaSize, 0, TAU);
+                ctx.stroke();
+                
+                // Lava flows radiating outward
+                const flowCount = 6 + Math.floor(rng.rand() * 4);
+                for (let j = 0; j < flowCount; j++) {
+                    const flowAngle = (j / flowCount) * TAU + rng.rand() * 0.5;
+                    const flowLength = pr * (0.2 + rng.rand() * 0.3);
+                    
+                    ctx.globalAlpha = 0.4 + rng.rand() * 0.2;
+                    ctx.strokeStyle = '#FF4500';
+                    ctx.lineWidth = 2 + rng.rand() * 3;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(volcanoX, volcanoY);
+                    
+                    // Create meandering lava flow
+                    const segments = 8;
+                    for (let k = 1; k <= segments; k++) {
+                        const t = k / segments;
+                        const baseX = volcanoX + Math.cos(flowAngle) * flowLength * t;
+                        const baseY = volcanoY + Math.sin(flowAngle) * flowLength * t;
+                        
+                        const meander = (rng.rand() - 0.5) * pr * 0.05 * (1 - t); // Less meandering as it gets further
+                        const perpAngle = flowAngle + Math.PI / 2;
+                        const finalX = baseX + Math.cos(perpAngle) * meander;
+                        const finalY = baseY + Math.sin(perpAngle) * meander;
+                        
+                        ctx.lineTo(finalX, finalY);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Volcanic vent (glowing center)
+                ctx.globalAlpha = 0.8;
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(volcanoX, volcanoY, pr * 0.015, 0, TAU);
+                ctx.fill();
+            }
+            
+        } else if (planet.Teq < 200) {
+            // Detailed frozen world
+            
+            // Large ice sheets with crevasses
+            for (let i = 0; i < 4; i++) {
+                const iceX = px + (rng.rand() - 0.5) * pr * 1.6;
+                const iceY = py + (rng.rand() - 0.5) * pr * 1.6;
+                const iceSize = pr * (0.2 + rng.rand() * 0.3);
+                
+                ctx.globalAlpha = 0.25;
+                ctx.fillStyle = '#F0F8FF';
+                
+                // Create jagged ice formation
+                ctx.beginPath();
+                const icePoints = 12;
+                for (let j = 0; j < icePoints; j++) {
+                    const angle = (j / icePoints) * TAU;
+                    const variance = 0.7 + rng.rand() * 0.6;
+                    const r = iceSize * variance;
+                    const x = iceX + Math.cos(angle) * r;
+                    const y = iceY + Math.sin(angle) * r;
+                    if (j === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Add ice crevasses
+                for (let j = 0; j < 6; j++) {
+                    const crevAngle = rng.rand() * TAU;
+                    const crevLength = iceSize * (0.5 + rng.rand() * 0.8);
+                    
+                    ctx.globalAlpha = 0.4;
+                    ctx.strokeStyle = '#4682B4';
+                    ctx.lineWidth = 1 + rng.rand() * 2;
+                    
+                    ctx.beginPath();
+                    const startX = iceX + Math.cos(crevAngle) * iceSize * 0.3;
+                    const startY = iceY + Math.sin(crevAngle) * iceSize * 0.3;
+                    const endX = startX + Math.cos(crevAngle) * crevLength;
+                    const endY = startY + Math.sin(crevAngle) * crevLength;
+                    
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+            }
+            
+        } else {
+            // Detailed desert/barren world
+            
+            // Mesa formations and canyon systems
+            for (let i = 0; i < 5; i++) {
+                const mesaX = px + (rng.rand() - 0.5) * pr * 1.4;
+                const mesaY = py + (rng.rand() - 0.5) * pr * 1.4;
+                const mesaW = pr * (0.08 + rng.rand() * 0.12);
+                const mesaH = pr * (0.06 + rng.rand() * 0.10);
+                
+                ctx.globalAlpha = 0.2 + rng.rand() * 0.15;
+                ctx.fillStyle = '#CD853F';
+                
+                // Create angular mesa shape
+                ctx.save();
+                ctx.translate(mesaX, mesaY);
+                ctx.rotate(rng.rand() * TAU);
+                
+                ctx.beginPath();
+                // Create layered rock formation
+                const layers = 3 + Math.floor(rng.rand() * 3);
+                for (let layer = 0; layer < layers; layer++) {
+                    const layerScale = (layers - layer) / layers;
+                    const layerW = mesaW * layerScale;
+                    const layerH = mesaH * layerScale * 0.3;
+                    const layerY = -mesaH * 0.5 + layer * mesaH * 0.2;
+                    
+                    ctx.fillRect(-layerW/2, layerY, layerW, layerH);
+                }
+                
+                ctx.restore();
+            }
+            
+            // Canyon networks
+            for (let i = 0; i < 3; i++) {
+                const canyonStartX = px + (rng.rand() - 0.5) * pr * 1.2;
+                const canyonStartY = py + (rng.rand() - 0.5) * pr * 1.2;
+                
+                ctx.globalAlpha = 0.3;
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 3 + rng.rand() * 4;
+                
+                // Create branching canyon system
+                function drawCanyonBranch(startX, startY, angle, length, depth) {
+                    if (depth <= 0 || length < pr * 0.05) return;
+                    
+                    const endX = startX + Math.cos(angle) * length;
+                    const endY = startY + Math.sin(angle) * length;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                    
+                    // Create branches
+                    if (rng.rand() > 0.4 && depth > 1) {
+                        const branchAngle1 = angle + (rng.rand() - 0.5) * Math.PI * 0.6;
+                        const branchAngle2 = angle + (rng.rand() - 0.5) * Math.PI * 0.6;
+                        const branchLength = length * (0.6 + rng.rand() * 0.3);
+                        
+                        drawCanyonBranch(endX, endY, branchAngle1, branchLength, depth - 1);
+                        if (rng.rand() > 0.5) {
+                            drawCanyonBranch(endX, endY, branchAngle2, branchLength, depth - 1);
+                        }
+                    }
+                }
+                
+                drawCanyonBranch(canyonStartX, canyonStartY, rng.rand() * TAU, pr * (0.2 + rng.rand() * 0.3), 3);
+            }
         }
         
-        // Detailed craters
-        for (let i = 0; i < 25; i++) {
+        // Add realistic impact craters with ejecta patterns
+        const craterCount = planet.atmosphere.pressure > 0.1 ? 6 : 12;
+        for (let i = 0; i < craterCount; i++) {
             const craterX = px + (rng.rand() - 0.5) * pr * 1.8;
             const craterY = py + (rng.rand() - 0.5) * pr * 1.8;
-            const craterR = pr * (0.02 + rng.rand() * 0.08);
+            const craterR = pr * (0.02 + rng.rand() * 0.06);
             
-            ctx.globalAlpha = 0.4;
-            ctx.fillStyle = '#000';
+            // Main crater depression
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.beginPath();
             ctx.arc(craterX, craterY, craterR, 0, TAU);
             ctx.fill();
             
-            // Crater rim
-            ctx.globalAlpha = 0.2;
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
+            // Crater rim with realistic lighting
+            ctx.globalAlpha = 0.3;
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.arc(craterX, craterY, craterR * 1.2, 0, TAU);
+            ctx.arc(craterX - craterR * 0.3, craterY - craterR * 0.3, craterR * 1.2, Math.PI, TAU + Math.PI/2);
             ctx.stroke();
+            
+            // Ejecta rays for larger craters
+            if (craterR > pr * 0.04) {
+                ctx.globalAlpha = 0.15;
+                ctx.strokeStyle = 'rgba(200,200,200,0.3)';
+                ctx.lineWidth = 1;
+                
+                const rayCount = 4 + Math.floor(rng.rand() * 4);
+                for (let j = 0; j < rayCount; j++) {
+                    const rayAngle = (j / rayCount) * TAU + rng.rand() * 0.5;
+                    const rayLength = craterR * (3 + rng.rand() * 4);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(craterX + Math.cos(rayAngle) * craterR * 1.2, 
+                              craterY + Math.sin(rayAngle) * craterR * 1.2);
+                    ctx.lineTo(craterX + Math.cos(rayAngle) * rayLength,
+                              craterY + Math.sin(rayAngle) * rayLength);
+                    ctx.stroke();
+                }
+            }
         }
         
         ctx.restore();
