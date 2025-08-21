@@ -61,6 +61,21 @@
                 <div id="cards" role="region" aria-live="polite" aria-atomic="true"></div>
             </div>
         </aside>
+        
+        <div id="planetDetail" class="planet-detail" style="display: none;">
+            <div class="panel-head">
+                <div style="font-weight:700">Planet Detail View</div>
+                <div class="spacer"></div>
+                <button class="btn alt" id="closePlanetDetail" aria-label="Close planet detail view">×</button>
+            </div>
+            <div class="detail-content">
+                <canvas id="planetCanvas" width="300" height="300" aria-label="Planet close-up view"></canvas>
+                <div class="detail-info">
+                    <h3 id="planetDetailName">Planet Name</h3>
+                    <div id="planetDetailStats" class="kv"></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

@@ -394,10 +394,62 @@ function drawPlanet(p, idx, time, hitList) {
 
     const pr = (p.radiusE * 2.2 + 6) * DPR;
     if (p.type === 'rocky') {
+        // Base planet
         ctx.fillStyle = p.color;
         ctx.beginPath();
         ctx.arc(px, py, pr, 0, TAU);
         ctx.fill();
+        
+        // Add surface features for rocky planets
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.clip();
+        
+        // Generate deterministic surface features
+        const rng = makeRng(p.name + '_surface');
+        
+        // Add continents/land masses
+        for (let i = 0; i < 8; i++) {
+            const featureX = px + (rng.rand() - 0.5) * pr * 1.6;
+            const featureY = py + (rng.rand() - 0.5) * pr * 1.6;
+            const featureR = pr * (0.15 + rng.rand() * 0.25);
+            
+            ctx.globalAlpha = 0.2 + rng.rand() * 0.15;
+            ctx.fillStyle = p.Teq > 300 ? '#8B4513' : (p.Teq < 250 ? '#E6E6FA' : '#228B22');
+            ctx.beginPath();
+            ctx.arc(featureX, featureY, featureR, 0, TAU);
+            ctx.fill();
+        }
+        
+        // Add craters
+        for (let i = 0; i < 12; i++) {
+            const craterX = px + (rng.rand() - 0.5) * pr * 1.8;
+            const craterY = py + (rng.rand() - 0.5) * pr * 1.8;
+            const craterR = pr * (0.05 + rng.rand() * 0.1);
+            
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(craterX, craterY, craterR, 0, TAU);
+            ctx.fill();
+        }
+        
+        // Add polar ice caps if cold enough
+        if (p.Teq < 280) {
+            ctx.globalAlpha = 0.6;
+            ctx.fillStyle = '#F0F8FF';
+            ctx.beginPath();
+            ctx.arc(px, py - pr * 0.7, pr * 0.3, 0, TAU);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(px, py + pr * 0.7, pr * 0.25, 0, TAU);
+            ctx.fill();
+        }
+        
+        ctx.restore();
+        
+        // Terminator shadow
         ctx.globalAlpha = 0.18;
         ctx.fillStyle = '#000';
         ctx.beginPath();
@@ -409,16 +461,164 @@ function drawPlanet(p, idx, time, hitList) {
         ctx.beginPath();
         ctx.arc(px, py, pr, 0, TAU);
         ctx.clip();
-        const bands = 10;
-        const bandH = pr * 0.22;
+        
+        // Enhanced gas giant bands with storm distortions
+        const bands = 12;
+        const bandH = pr * 0.2;
         const stripes = Array.isArray(p.stripes) && p.stripes.length ? p.stripes : randomAnalogousColors(makeRng(p.name), 7);
-        for (let i = 0; i < bands; i++) {
-            const t = i / (bands - 1);
-            ctx.fillStyle = stripes[i % stripes.length];
-            const y = py - pr + t * pr * 2 - bandH / 2;
-            ctx.fillRect(px - pr, y, pr * 2, bandH);
+        
+        // Create storm distortion data for larger gas giants
+        const storms = [];
+        if (p.radiusE > 3) {
+            const stormRng = makeRng(p.name + '_storms');
+            for (let i = 0; i < 2; i++) {
+                storms.push({
+                    x: px + (stormRng.rand() - 0.5) * pr * 1.0,
+                    y: py + (stormRng.rand() - 0.5) * pr * 0.6,
+                    radius: pr * (0.06 + stormRng.rand() * 0.04), // Much smaller
+                    strength: 0.2 + stormRng.rand() * 0.3,
+                    rotation: stormRng.rand() * TAU
+                });
+            }
         }
+        
+        // Draw bands with storm integration
+        for (let i = 0; i < bands; i++) {
+            const t = i / bands;
+            ctx.fillStyle = stripes[i % stripes.length];
+            
+            const baseY = py - pr + t * pr * 2;
+            const bandH = pr * 0.2;
+            
+            // Check if this band is affected by storms
+            let stormInfluence = 0;
+            let stormColor = stripes[i % stripes.length];
+            
+            storms.forEach(storm => {
+                const bandCenterY = baseY + bandH / 2;
+                const distanceToStorm = Math.abs(bandCenterY - storm.y);
+                
+                if (distanceToStorm < storm.radius * 2) {
+                    const influence = Math.max(0, 1 - distanceToStorm / (storm.radius * 2));
+                    if (influence > stormInfluence) {
+                        stormInfluence = influence;
+                        // Darken band color in storm areas
+                        stormColor = stripes[i % stripes.length]
+                            .replace(/(\d+)%\)/, (match, l) => `${Math.max(10, parseInt(l) - Math.floor(influence * 20))}%)`);
+                    }
+                }
+            });
+            
+            ctx.fillStyle = stormColor;
+            
+            // Draw band with potential storm warping
+            if (stormInfluence > 0.1) {
+                // Draw warped band
+                ctx.beginPath();
+                let firstPoint = true;
+                
+                for (let x = px - pr; x <= px + pr; x += 3) {
+                    let y1 = baseY;
+                    let y2 = baseY + bandH;
+                    
+                    // Apply storm warping
+                    storms.forEach(storm => {
+                        const dx = x - storm.x;
+                        const dy1 = y1 - storm.y;
+                        const dy2 = y2 - storm.y;
+                        const dist1 = Math.sqrt(dx * dx + dy1 * dy1);
+                        const dist2 = Math.sqrt(dx * dx + dy2 * dy2);
+                        
+                        if (dist1 < storm.radius * 3) {
+                            const influence = Math.max(0, 1 - dist1 / (storm.radius * 3)) * storm.strength;
+                            const angle = Math.atan2(dy1, dx) + storm.rotation;
+                            y1 += Math.sin(angle * 2) * influence * pr * 0.04;
+                        }
+                        if (dist2 < storm.radius * 3) {
+                            const influence = Math.max(0, 1 - dist2 / (storm.radius * 3)) * storm.strength;
+                            const angle = Math.atan2(dy2, dx) + storm.rotation;
+                            y2 += Math.sin(angle * 2) * influence * pr * 0.04;
+                        }
+                    });
+                    
+                    if (firstPoint) {
+                        ctx.moveTo(x, y1);
+                        firstPoint = false;
+                    } else {
+                        ctx.lineTo(x, y1);
+                    }
+                }
+                
+                // Complete the warped band shape
+                for (let x = px + pr; x >= px - pr; x -= 3) {
+                    let y2 = baseY + bandH;
+                    
+                    storms.forEach(storm => {
+                        const dx = x - storm.x;
+                        const dy2 = y2 - storm.y;
+                        const dist2 = Math.sqrt(dx * dx + dy2 * dy2);
+                        
+                        if (dist2 < storm.radius * 3) {
+                            const influence = Math.max(0, 1 - dist2 / (storm.radius * 3)) * storm.strength;
+                            const angle = Math.atan2(dy2, dx) + storm.rotation;
+                            y2 += Math.sin(angle * 2) * influence * pr * 0.04;
+                        }
+                    });
+                    
+                    ctx.lineTo(x, y2);
+                }
+                
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // Draw normal straight band
+                ctx.fillRect(px - pr, baseY, pr * 2, bandH);
+            }
+            
+            // Add subtle turbulence overlay
+            ctx.globalAlpha = 0.3;
+            const turbulence = Math.sin((i + time * 0.05) * 3) * pr * 0.02;
+            ctx.fillRect(px - pr, baseY + turbulence, pr * 2, bandH * 0.5);
+            ctx.globalAlpha = 1;
+        }
+        
+        // Add subtle storm centers for visual clarity
+        storms.forEach(storm => {
+            ctx.save();
+            ctx.translate(storm.x, storm.y);
+            ctx.scale(1, 0.7); // Oval shape
+            
+            const bandIndex = Math.floor((storm.y - py + pr) / (pr * 2) * bands);
+            const localColor = stripes[Math.max(0, Math.min(bandIndex, stripes.length - 1)) % stripes.length];
+            
+            // Very subtle storm center
+            const centerGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, storm.radius);
+            centerGrad.addColorStop(0, localColor.replace(/(\d+)%\)/, (match, l) => `${Math.max(5, parseInt(l) - 25)}%)`));
+            centerGrad.addColorStop(0.7, localColor.replace(/(\d+)%\)/, (match, l) => `${Math.max(10, parseInt(l) - 10)}%)`));
+            centerGrad.addColorStop(1, localColor);
+            
+            ctx.globalAlpha = 0.6;
+            ctx.fillStyle = centerGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, storm.radius, 0, TAU);
+            ctx.fill();
+            
+            ctx.restore();
+            ctx.globalAlpha = 1;
+        });
+        
         ctx.restore();
+        
+        // Add atmospheric glow
+        const glow = ctx.createRadialGradient(px, py, pr * 0.8, px, py, pr * 1.2);
+        glow.addColorStop(0, 'rgba(0,0,0,0)');
+        glow.addColorStop(1, 'rgba(134, 167, 255, 0.25)'); // Blue gas giant glow
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, py, pr * 1.2, 0, TAU);
+        ctx.fill();
+        
+        // Terminator shadow
         ctx.globalAlpha = 0.18;
         ctx.fillStyle = '#000';
         ctx.beginPath();
@@ -426,6 +626,7 @@ function drawPlanet(p, idx, time, hitList) {
         ctx.fill();
         ctx.globalAlpha = 1;
     } else {
+        // Ice giant with enhanced features
         const grad = ctx.createRadialGradient(px - pr * 0.3, py - pr * 0.3, pr * 0.1, px, py, pr);
         grad.addColorStop(0, '#ffffff');
         grad.addColorStop(1, p.color);
@@ -433,6 +634,45 @@ function drawPlanet(p, idx, time, hitList) {
         ctx.beginPath();
         ctx.arc(px, py, pr, 0, TAU);
         ctx.fill();
+        
+        // Add ice giant bands (subtle)
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.clip();
+        
+        const rng = makeRng(p.name + '_ice');
+        for (let i = 0; i < 6; i++) {
+            const t = (i + 0.5) / 6;
+            const bandY = py - pr + t * pr * 2;
+            ctx.globalAlpha = 0.1;
+            ctx.fillStyle = rng.rand() > 0.5 ? '#87CEEB' : '#B0E0E6';
+            ctx.fillRect(px - pr, bandY - pr * 0.1, pr * 2, pr * 0.2);
+        }
+        
+        // Add atmospheric shimmer
+        for (let i = 0; i < 8; i++) {
+            const shimmerX = px + (rng.rand() - 0.5) * pr * 1.6;
+            const shimmerY = py + (rng.rand() - 0.5) * pr * 1.6;
+            ctx.globalAlpha = 0.2;
+            ctx.fillStyle = '#E0FFFF';
+            ctx.beginPath();
+            ctx.arc(shimmerX, shimmerY, pr * 0.05, 0, TAU);
+            ctx.fill();
+        }
+        
+        ctx.restore();
+        
+        // Atmospheric glow for ice giants
+        const iceGlow = ctx.createRadialGradient(px, py, pr * 0.9, px, py, pr * 1.1);
+        iceGlow.addColorStop(0, 'rgba(0,0,0,0)');
+        iceGlow.addColorStop(1, 'rgba(135, 206, 235, 0.38)'); // Ice blue glow
+        ctx.fillStyle = iceGlow;
+        ctx.beginPath();
+        ctx.arc(px, py, pr * 1.1, 0, TAU);
+        ctx.fill();
+        
+        // Terminator shadow
         ctx.globalAlpha = 0.12;
         ctx.fillStyle = '#000';
         ctx.beginPath();
@@ -503,6 +743,313 @@ function drawSystem() {
     if (selectedHit) drawHL(selectedHit);
 
     return {starHit, hits};
+}
+
+function drawPlanetDetail(planet, canvas, ctx) {
+    const w = canvas.width / window.devicePixelRatio;
+    const h = canvas.height / window.devicePixelRatio;
+    const centerX = w / 2;
+    const centerY = h / 2;
+    const radius = Math.min(w, h) * 0.35;
+    
+    console.log('Drawing planet detail:', {w, h, centerX, centerY, radius});
+    
+    // Clear canvas with space background
+    ctx.clearRect(0, 0, w, h);
+    const bgGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(w, h) / 2);
+    bgGrad.addColorStop(0, '#1a2040');
+    bgGrad.addColorStop(1, '#0b1020');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+    
+    // Add stars in background
+    const starRng = makeRng(planet.name + '_detailstars');
+    for (let i = 0; i < 50; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${0.3 + starRng.rand() * 0.7})`;
+        ctx.beginPath();
+        ctx.arc(starRng.rand() * w, starRng.rand() * h, 0.5 + starRng.rand() * 1, 0, TAU);
+        ctx.fill();
+    }
+    
+    // Draw planet at larger scale with enhanced detail
+    const pr = radius;
+    const px = centerX;
+    const py = centerY;
+    
+    if (planet.type === 'rocky') {
+        // Enhanced rocky planet detail
+        ctx.fillStyle = planet.color;
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.fill();
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.clip();
+        
+        const rng = makeRng(planet.name + '_detailsurface');
+        
+        // Large continental features
+        for (let i = 0; i < 15; i++) {
+            const featureX = px + (rng.rand() - 0.5) * pr * 1.8;
+            const featureY = py + (rng.rand() - 0.5) * pr * 1.8;
+            const featureR = pr * (0.1 + rng.rand() * 0.3);
+            
+            ctx.globalAlpha = 0.3 + rng.rand() * 0.2;
+            if (planet.Teq > 350) ctx.fillStyle = '#CD853F'; // Hot desert
+            else if (planet.Teq < 250) ctx.fillStyle = '#F0F8FF'; // Ice
+            else ctx.fillStyle = rng.rand() > 0.6 ? '#228B22' : '#8B4513'; // Forest or rock
+            
+            ctx.beginPath();
+            ctx.arc(featureX, featureY, featureR, 0, TAU);
+            ctx.fill();
+        }
+        
+        // Mountain ranges (detailed)
+        for (let i = 0; i < 8; i++) {
+            const startX = px + (rng.rand() - 0.5) * pr * 1.6;
+            const startY = py + (rng.rand() - 0.5) * pr * 1.6;
+            ctx.strokeStyle = '#696969';
+            ctx.lineWidth = 2 + rng.rand() * 3;
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            for (let j = 0; j < 5; j++) {
+                ctx.lineTo(startX + (rng.rand() - 0.5) * pr * 0.3, startY + (rng.rand() - 0.5) * pr * 0.3);
+            }
+            ctx.stroke();
+        }
+        
+        // Detailed craters
+        for (let i = 0; i < 25; i++) {
+            const craterX = px + (rng.rand() - 0.5) * pr * 1.8;
+            const craterY = py + (rng.rand() - 0.5) * pr * 1.8;
+            const craterR = pr * (0.02 + rng.rand() * 0.08);
+            
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(craterX, craterY, craterR, 0, TAU);
+            ctx.fill();
+            
+            // Crater rim
+            ctx.globalAlpha = 0.2;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(craterX, craterY, craterR * 1.2, 0, TAU);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+        
+        // Day/night terminator
+        ctx.save();
+        const termGrad = ctx.createLinearGradient(px - pr, py, px + pr, py);
+        termGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+        termGrad.addColorStop(0.6, 'rgba(0,0,0,0)');
+        ctx.fillStyle = termGrad;
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+        
+    } else if (planet.type === 'gas giant') {
+        // Enhanced gas giant detail
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.clip();
+        
+        const bands = 20;
+        const stripes = Array.isArray(planet.stripes) && planet.stripes.length ? planet.stripes : randomAnalogousColors(makeRng(planet.name), 7);
+        const rng = makeRng(planet.name + '_detailbands');
+        
+        // Create detailed storm distortion data
+        const detailStorms = [];
+        if (planet.radiusE > 3) {
+            const stormRng = makeRng(planet.name + '_detailstorms');
+            for (let i = 0; i < 3; i++) {
+                detailStorms.push({
+                    x: px + (stormRng.rand() - 0.5) * pr * 1.2,
+                    y: py + (stormRng.rand() - 0.5) * pr * 0.8,
+                    radius: pr * (0.05 + stormRng.rand() * 0.04), // Much smaller
+                    strength: 0.2 + stormRng.rand() * 0.3,
+                    rotation: stormRng.rand() * TAU,
+                    swirl: stormRng.rand() * 2 - 1 // Clockwise or counterclockwise
+                });
+            }
+        }
+        
+        // Draw bands with integrated storm effects  
+        for (let i = 0; i < bands; i++) {
+            const t = i / bands;
+            ctx.fillStyle = stripes[i % stripes.length];
+            
+            const baseY = py - pr + t * pr * 2;
+            const bandHeight = pr * 0.15;
+            
+            // Check for storm influence on this band
+            let stormInfluence = 0;
+            let stormColor = stripes[i % stripes.length];
+            
+            detailStorms.forEach(storm => {
+                const bandCenterY = baseY + bandHeight / 2;
+                const distanceToStorm = Math.abs(bandCenterY - storm.y);
+                
+                if (distanceToStorm < storm.radius * 3) {
+                    const influence = Math.max(0, 1 - distanceToStorm / (storm.radius * 3));
+                    if (influence > stormInfluence) {
+                        stormInfluence = influence;
+                        stormColor = stripes[i % stripes.length]
+                            .replace(/(\d+)%\)/, (match, l) => `${Math.max(8, parseInt(l) - Math.floor(influence * 15))}%)`);
+                    }
+                }
+            });
+            
+            ctx.fillStyle = stormColor;
+            
+            // Draw band with storm warping if affected
+            if (stormInfluence > 0.05) {
+                ctx.beginPath();
+                let firstPoint = true;
+                
+                // Top edge with storm distortion
+                for (let x = px - pr; x <= px + pr; x += 2) {
+                    let y = baseY;
+                    
+                    detailStorms.forEach(storm => {
+                        const dx = x - storm.x;
+                        const dy = y - storm.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < storm.radius * 4) {
+                            const influence = Math.max(0, 1 - dist / (storm.radius * 4)) * storm.strength;
+                            const angle = Math.atan2(dy, dx) + storm.rotation;
+                            y += Math.sin(angle * 3 + storm.swirl) * influence * pr * 0.03;
+                        }
+                    });
+                    
+                    if (firstPoint) {
+                        ctx.moveTo(x, y);
+                        firstPoint = false;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                // Bottom edge with storm distortion
+                for (let x = px + pr; x >= px - pr; x -= 2) {
+                    let y = baseY + bandHeight;
+                    
+                    detailStorms.forEach(storm => {
+                        const dx = x - storm.x;
+                        const dy = y - storm.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < storm.radius * 4) {
+                            const influence = Math.max(0, 1 - dist / (storm.radius * 4)) * storm.strength;
+                            const angle = Math.atan2(dy, dx) + storm.rotation;
+                            y += Math.sin(angle * 3 + storm.swirl) * influence * pr * 0.03;
+                        }
+                    });
+                    
+                    ctx.lineTo(x, y);
+                }
+                
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // Normal straight band
+                ctx.fillRect(px - pr, baseY, pr * 2, bandHeight);
+            }
+        }
+        
+        // Add very subtle storm centers
+        detailStorms.forEach(storm => {
+            ctx.save();
+            ctx.translate(storm.x, storm.y);
+            ctx.scale(1.2, 0.8);
+            
+            const bandIndex = Math.floor((storm.y - py + pr) / (pr * 2) * bands);
+            const localColor = stripes[Math.max(0, Math.min(bandIndex, stripes.length - 1)) % stripes.length];
+            
+            // Subtle storm center with spiral
+            const stormGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, storm.radius * 1.2);
+            stormGrad.addColorStop(0, localColor.replace(/(\d+)%\)/, (match, l) => `${Math.max(0, parseInt(l) - 20)}%)`));
+            stormGrad.addColorStop(0.5, localColor.replace(/(\d+)%\)/, (match, l) => `${Math.max(5, parseInt(l) - 12)}%)`));
+            stormGrad.addColorStop(1, localColor);
+            
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = stormGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, storm.radius * 1.2, 0, TAU);
+            ctx.fill();
+            
+            // Tiny spiral pattern
+            ctx.globalAlpha = 0.3;
+            ctx.strokeStyle = localColor.replace(/(\d+)%\)/, (match, l) => `${Math.max(0, parseInt(l) - 25)}%)`);
+            ctx.lineWidth = 1;
+            
+            ctx.beginPath();
+            for (let a = 0; a < TAU * 2; a += 0.1) {
+                const r = (a / (TAU * 2)) * storm.radius;
+                const spiralAngle = a * 0.7 + storm.swirl * a * 0.3;
+                const x = Math.cos(spiralAngle) * r;
+                const y = Math.sin(spiralAngle) * r;
+                if (a === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            ctx.restore();
+            ctx.globalAlpha = 1;
+        });
+        
+        ctx.restore();
+    } else {
+        // Enhanced ice giant detail
+        const grad = ctx.createRadialGradient(px - pr * 0.3, py - pr * 0.3, pr * 0.1, px, py, pr);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(1, planet.color);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.fill();
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, TAU);
+        ctx.clip();
+        
+        // Detailed ice bands
+        const rng = makeRng(planet.name + '_detailice');
+        for (let i = 0; i < 12; i++) {
+            const t = (i + 0.5) / 12;
+            const bandY = py - pr + t * pr * 2;
+            ctx.globalAlpha = 0.15;
+            ctx.fillStyle = rng.rand() > 0.5 ? '#87CEEB' : '#B0E0E6';
+            ctx.fillRect(px - pr, bandY - pr * 0.05, pr * 2, pr * 0.1);
+        }
+        
+        ctx.restore();
+    }
+    
+    // Atmospheric glow
+    const glowGrad = ctx.createRadialGradient(px, py, pr * 0.95, px, py, pr * 1.15);
+    glowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    if (planet.type === 'gas giant') {
+        glowGrad.addColorStop(1, 'rgba(134, 167, 255, 0.25)'); // Gas giant glow
+    } else if (planet.type === 'ice giant') {
+        glowGrad.addColorStop(1, 'rgba(135, 206, 235, 0.19)'); // Ice giant glow
+    } else {
+        glowGrad.addColorStop(1, 'rgba(160, 160, 160, 0.19)'); // Rocky planet glow
+    }
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(px, py, pr * 1.15, 0, TAU);
+    ctx.fill();
 }
 
 // ---------- Interaction ----------
@@ -615,6 +1162,23 @@ canvas.addEventListener('click', (e) => {
         state.selected = target;
         showInInspector(target);
         markNeedsRedraw();
+        
+        // If planet detail view is open, handle selection change
+        const detailPanel = document.getElementById('planetDetail');
+        if (detailPanel.style.display === 'block') {
+            if (target && target.kind === 'planet') {
+                // Update to new planet
+                openPlanetDetail(target.ref);
+            } else {
+                // Close detail view if non-planet selected
+                closePlanetDetail();
+            }
+        }
+    }
+    
+    // Double-click to open planet detail view
+    if (e.detail === 2 && target && target.kind === 'planet') {
+        openPlanetDetail(target.ref);
     }
 });
 
@@ -790,6 +1354,15 @@ function showInInspector(target) {
         <div>Life</div><div>${p.life.has ? p.life.description : 'none detected'}</div>
       </div>
     `);
+        
+        // Add planet detail button
+        const detailBtn = document.createElement('button');
+        detailBtn.className = 'btn';
+        detailBtn.textContent = 'View Planet Detail';
+        detailBtn.style.marginTop = '8px';
+        detailBtn.style.width = '100%';
+        detailBtn.onclick = () => openPlanetDetail(p);
+        wrap.lastElementChild.appendChild(detailBtn);
         if (p.life.has) {
             const biomes = p.life.biomes && p.life.biomes.length ? p.life.biomes.join(', ') : '—';
             addCard('Life Details', `
@@ -938,6 +1511,84 @@ function tick(now) {
 
     requestAnimationFrame(tick);
 }
+
+// ---------- Planet Detail View ----------
+function openPlanetDetail(planet) {
+    console.log('Opening planet detail for:', planet.name);
+    const detailPanel = document.getElementById('planetDetail');
+    const planetCanvas = document.getElementById('planetCanvas');
+    const planetName = document.getElementById('planetDetailName');
+    const planetStats = document.getElementById('planetDetailStats');
+    
+    if (!detailPanel || !planetCanvas) {
+        console.error('Planet detail elements not found');
+        return;
+    }
+    
+    // Show panel (if not already shown)
+    const wasHidden = detailPanel.style.display === 'none' || !detailPanel.style.display;
+    detailPanel.style.display = 'block';
+    
+    // Update info immediately
+    planetName.textContent = `${planet.name} (${planet.type})`;
+    
+    // Clear canvas while updating
+    const planetCtx = planetCanvas.getContext('2d');
+    planetCtx.clearRect(0, 0, planetCanvas.width, planetCanvas.height);
+    
+    planetStats.innerHTML = `
+        <div>Orbit Distance</div><div>${planet.aAU} AU</div>
+        <div>Orbital Period</div><div>${planet.periodY} years</div>
+        <div>Eccentricity</div><div>${planet.ecc}</div>
+        <div>Radius</div><div>${planet.radiusE} R⊕</div>
+        <div>Mass</div><div>${planet.massE} M⊕</div>
+        <div>Surface Temp</div><div>${planet.Teq} K</div>
+        <div>Albedo</div><div>${planet.albedo}</div>
+        <div>Atmosphere</div><div>${planet.atmosphere.desc}</div>
+        <div>Pressure</div><div>${planet.atmosphere.pressure.toFixed(2)} bar</div>
+        <div>Breathable</div><div>${planet.atmosphere.breathable ? "Yes" : "No"}</div>
+        <div>Rings</div><div>${planet.hasRings ? "Yes" : "No"}</div>
+        <div>Moons</div><div>${planet.moons.length}</div>
+        <div>Life Detected</div><div>${planet.life.has ? planet.life.description : 'None'}</div>
+    `;
+    
+    // Set up and render canvas (with appropriate delay if panel was just shown)
+    const renderCanvas = () => {
+        const planetCtx = planetCanvas.getContext('2d');
+        const rect = planetCanvas.getBoundingClientRect();
+        console.log('Canvas rect:', rect);
+        
+        planetCanvas.width = rect.width * window.devicePixelRatio;
+        planetCanvas.height = rect.height * window.devicePixelRatio;
+        planetCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        
+        // Render planet detail
+        drawPlanetDetail(planet, planetCanvas, planetCtx);
+        console.log('Planet detail rendered for:', planet.name);
+    };
+    
+    if (wasHidden) {
+        // Panel was just shown, wait for layout
+        setTimeout(renderCanvas, 50);
+    } else {
+        // Panel already open, render immediately
+        renderCanvas();
+    }
+}
+
+function closePlanetDetail() {
+    document.getElementById('planetDetail').style.display = 'none';
+}
+
+// Close button handler
+document.getElementById('closePlanetDetail').addEventListener('click', closePlanetDetail);
+
+// Close on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closePlanetDetail();
+    }
+});
 
 resize();
 const hashSeed = decodeURIComponent((location.hash || '').slice(1));
