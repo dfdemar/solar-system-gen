@@ -1,0 +1,17 @@
+{
+  "name": "solar-system-gen",
+  "version": "1.0.0",
+  "description": "An interactive web-based procedural solar system generator that creates scientifically plausible star systems with planets, moons, and potential life.",
+  "main": "script.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "30.0.5",
+    "jest-environment-jsdom": "30.0.5"
+  }
+}

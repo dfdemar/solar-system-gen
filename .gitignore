@@ -1,27 +1,91 @@
-# Node.js dependencies
-node_modules/
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+/bower_components
 
-# Build output
-dist/
-build/
-
-# VS Code settings
-.vscode/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
+# Build outputs
+/dist
+/build
+/.next
+/out
+/.nuxt
 
 # Environment files
 .env
 .env.local
-.env.*
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
 
-# Misc
-*.tmp
+# Cache and logs
+.cache/
+.eslintcache
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
 
-# JetBrains IDEs
-.idea/
+# Coverage and test reports
+/coverage
+/.nyc_output
+/cypress/videos/
+/cypress/screenshots/
+
+# Editor/IDE specific
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Framework-specific files
+# Vite
+/vite.config.js.timestamp-*
+
+# Webpack
+/.webpack/
+
+# Parcel
+/.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+/tsconfig.tsbuildinfo
+
+# SASS/SCSS
+.sass-cache/
+*.css.map
+*.sass.map
+*.scss.map
+
+# Temporary files
+/tmp
+/temp
+
+# Generated files
+*.generated.*
+generated/
+
+# Local Netlify folder
+.netlify
+
+# AI
+CLAUDE.md
